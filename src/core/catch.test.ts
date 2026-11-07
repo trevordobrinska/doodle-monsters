@@ -38,9 +38,9 @@ describe("a Catch", () => {
 
   it("a missed tap does nothing", () => {
     const core = buildCore();
-    const { x, y, radius } = core.monster();
+    const { x, y, width } = core.monster();
 
-    expect(core.bonk({ x: x + radius * 3, y })).toBe("miss");
+    expect(core.bonk({ x: x + width * 1.5, y })).toBe("miss");
 
     expect(core.monster().dizzy).toBe(0);
     expect(core.monster().stunned).toBe(false);

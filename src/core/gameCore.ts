@@ -9,7 +9,15 @@ export interface Arena {
 export interface MonsterView {
   readonly x: number;
   readonly y: number;
-  readonly radius: number;
+  /**
+   * The Monster's size in arena units: its drawing is shown in this box,
+   * centred on x, y. It bounces off walls at the box's edges, and taps
+   * anywhere in the oval that fills the box land on it.
+   */
+  readonly width: number;
+  readonly height: number;
+  /** The name of the color the Monster was mostly drawn in, e.g. "purple". */
+  readonly mainColor: string;
   /** Velocity in pixels per second. Zero while Stunned. */
   readonly vx: number;
   readonly vy: number;
@@ -50,8 +58,30 @@ export type FlickResult = "flick" | "boing" | "caught" | "miss";
  */
 export type TickResult = "wallHit" | "none";
 
+/** Where the Round is: drawing the Monster, or catching it. */
+export type Phase = "draw" | "catch";
+
+/** What the drawing screen tells the core about a finished drawing. */
+export interface InkFacts {
+  /** Size of the drawing trimmed to its ink, in drawing-screen pixels. */
+  readonly width: number;
+  readonly height: number;
+  /** How much ink was laid down, in square drawing-screen pixels. */
+  readonly inkAmount: number;
+  /** The name of the color with the most ink, e.g. "purple". */
+  readonly mainColor: string;
+}
+
 export interface GameCore {
   readonly arena: Arena;
+  phase(): Phase;
+  /** Whether a drawing has enough ink to become a Monster. The drawing screen asks this to enable "Done". */
+  enoughInk(inkAmount: number): boolean;
+  /**
+   * The kid pressed "Done". Moves the Round from Draw to Catch, unless there
+   * isn't enough ink yet. Returns whether it moved on.
+   */
+  finishDrawing(ink: InkFacts): boolean;
   /** Advances the game by `dt` seconds. */
   tick(dt: number): TickResult;
   monster(): MonsterView;
@@ -72,7 +102,11 @@ export interface GameCoreDeps {
 /** Landscape Fire HD 8 resolution: the size every rule is designed against. */
 const ARENA: Arena = { width: 1280, height: 800 };
 
-const MONSTER_RADIUS = 60;
+/**
+ * Every Monster's longest side, in arena units, however big it was drawn,
+ * so a tiny or huge drawing doesn't make a Catch unfair.
+ */
+const MONSTER_SIZE = 150;
 const MONSTER_SPEED = 320; // pixels per second
 /** Taps this far outside the Monster's edge still land, for small fingers. */
 const TOUCH_SLOP = 16;
@@ -99,6 +133,12 @@ const SLEEPY_SPEED = 0.5;
 const LOWEST_VOICE = 0.8;
 const HIGHEST_VOICE = 1.25;
 
+/**
+ * Ink needed before "Done" works, in square drawing-screen pixels: about a
+ * hand-span of thin line, so a single dot or tap can't become a Monster.
+ */
+const MIN_INK = 6000;
+
 export function createGameCore({ dice }: GameCoreDeps): GameCore {
   const arena = ARENA;
 
@@ -120,6 +160,14 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let caught = false;
   let catchSeconds = 0; // how long this Catch has been going
   const readyToCatch = () => dizzy >= FULL_DIZZY;
+  let phase: Phase = "draw";
+  let width = 0;
+  let height = 0;
+  let mainColor = "";
+  /** There's a Monster to Bonk and Flick: its Catch has begun and isn't over. */
+  const inPlay = () => phase === "catch" && !caught;
+  const halfW = () => width / 2;
+  const halfH = () => height / 2;
 
   function speed() {
     if (stunnedLeft > 0 || caught) return 0;
@@ -143,8 +191,8 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   /** Moves along the Flick until it meets a wall, then it's Stunned there. */
   function flyTowardsWall(dt: number): TickResult {
     const step = FLICK_SPEED * dt;
-    const toWallX = distanceToWall(x, dirX, MONSTER_RADIUS, arena.width - MONSTER_RADIUS);
-    const toWallY = distanceToWall(y, dirY, MONSTER_RADIUS, arena.height - MONSTER_RADIUS);
+    const toWallX = distanceToWall(x, dirX, halfW(), arena.width - halfW());
+    const toWallY = distanceToWall(y, dirY, halfH(), arena.height - halfH());
     const travel = Math.min(step, toWallX, toWallY);
     x += dirX * travel;
     y += dirY * travel;
@@ -170,6 +218,18 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     return undefined;
   }
 
+  /**
+   * Whether a tap (one point) or a swipe lands on the Monster's oval, with
+   * TOUCH_SLOP of slack all round. Squashing the arena so the oval becomes a
+   * unit circle turns this into a circle test.
+   */
+  function crossesMonster(path: readonly Point[]): boolean {
+    const rx = halfW() + TOUCH_SLOP;
+    const ry = halfH() + TOUCH_SLOP;
+    const squashed = path.map((p) => ({ x: (p.x - x) / rx, y: (p.y - y) / ry }));
+    return crossesCircle(squashed, { x: 0, y: 0 }, 1);
+  }
+
   function drainDizzy(dt: number) {
     // A fully Dizzy Monster waits for its catching tap rather than recovering.
     if (dizzy === 0 || readyToCatch()) return;
@@ -182,8 +242,19 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
 
   return {
     arena,
+    phase: () => phase,
+    enoughInk: (inkAmount) => inkAmount >= MIN_INK,
+    finishDrawing(ink) {
+      if (phase !== "draw" || ink.inkAmount < MIN_INK || !(ink.width > 0 && ink.height > 0)) return false;
+      const fit = MONSTER_SIZE / Math.max(ink.width, ink.height);
+      width = ink.width * fit;
+      height = ink.height * fit;
+      mainColor = ink.mainColor;
+      phase = "catch";
+      return true;
+    },
     tick(dt) {
-      if (caught) return "none";
+      if (!inPlay()) return "none";
       catchSeconds += dt;
       drainDizzy(dt);
       if (stunnedLeft > 0) {
@@ -196,14 +267,16 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       dashLeft = Math.max(0, dashLeft - dt);
       x += dirX * frameSpeed * dt;
       y += dirY * frameSpeed * dt;
-      ({ pos: x, dir: dirX } = bounce(x, dirX, MONSTER_RADIUS, arena.width - MONSTER_RADIUS));
-      ({ pos: y, dir: dirY } = bounce(y, dirY, MONSTER_RADIUS, arena.height - MONSTER_RADIUS));
+      ({ pos: x, dir: dirX } = bounce(x, dirX, halfW(), arena.width - halfW()));
+      ({ pos: y, dir: dirY } = bounce(y, dirY, halfH(), arena.height - halfH()));
       return "none";
     },
     monster: () => ({
       x,
       y,
-      radius: MONSTER_RADIUS,
+      width,
+      height,
+      mainColor,
       vx: dirX * speed(),
       vy: dirY * speed(),
       dizzy,
@@ -216,7 +289,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       voice,
     }),
     bonk(at) {
-      if (caught || Math.hypot(at.x - x, at.y - y) > MONSTER_RADIUS + TOUCH_SLOP) return "miss";
+      if (!inPlay() || !crossesMonster([at])) return "miss";
       const early = hitWithoutDizzy();
       if (early) return early;
       dizzy += 1;
@@ -225,7 +298,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       return "bonk";
     },
     flick(path) {
-      if (caught || !crossesCircle(path, { x, y }, MONSTER_RADIUS + TOUCH_SLOP)) return "miss";
+      if (!inPlay() || !crossesMonster(path)) return "miss";
       const dx = path[path.length - 1].x - path[0].x;
       const dy = path[path.length - 1].y - path[0].y;
       const length = Math.hypot(dx, dy);

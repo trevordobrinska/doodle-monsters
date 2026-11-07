@@ -9,14 +9,16 @@ import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
 import { listenForGestures } from "./input/gestures";
 import { createSound, type Effect } from "./sound/sound";
+import { createDrawScreen } from "./draw/drawScreen";
+import type { FinishedDrawing } from "./draw/drawing";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
 // was hidden) the game just resumes instead of leaping ahead.
 const MAX_DT = 0.1;
 
-// After a catch, how long the bubble shows before a tap starts a new Catch.
-// Placeholder until the Round (Draw → Catch → Zoo) exists.
-const NEW_CATCH_AFTER_MS = 1500;
+// After a catch, how long the bubble shows before a tap starts a new Round.
+// Placeholder until the Zoo exists (ticket 09).
+const NEW_ROUND_AFTER_MS = 1500;
 
 // The real-world clock and dice. The core never reaches for these itself,
 // so tests can swap in fake ones.
@@ -25,6 +27,8 @@ const randomDice: Dice = { roll: () => Math.random() };
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");
+const drawScreenRoot = document.querySelector<HTMLElement>("#draw-screen");
+if (!drawScreenRoot) throw new Error("Missing #draw-screen");
 
 const sound = createSound();
 
@@ -43,20 +47,36 @@ function playFor(result: TapResult | FlickResult | TickResult) {
 }
 
 let core: GameCore;
-let renderer: Renderer;
+/** Only exists once the drawing is done and the Catch has begun. */
+let renderer: Renderer | undefined;
 let catchStartedAt = 0;
 let caughtAt: number | undefined;
 
-function startCatch() {
+const drawScreen = createDrawScreen(drawScreenRoot, {
+  enoughInk: (inkAmount) => core.enoughInk(inkAmount),
+  onDone: startCatch,
+});
+
+/** A new Round begins on the drawing screen. */
+function startRound() {
   core = createGameCore({ clock: systemClock, dice: randomDice });
-  renderer = createRenderer(canvas!, core);
+  renderer = undefined;
+  caughtAt = undefined;
+  canvas!.hidden = true;
+  drawScreen.show();
+}
+
+function startCatch({ image, ink }: FinishedDrawing) {
+  if (!core.finishDrawing(ink)) return;
+  drawScreen.hide();
+  canvas!.hidden = false;
+  renderer = createRenderer(canvas!, core, image);
   renderer.resize();
   catchStartedAt = performance.now();
-  caughtAt = undefined;
 }
-startCatch();
+startRound();
 
-window.addEventListener("resize", () => renderer.resize());
+window.addEventListener("resize", () => renderer?.resize());
 
 function noteIfCaught(result: TapResult | FlickResult) {
   if (result !== "caught") return;
@@ -66,10 +86,12 @@ function noteIfCaught(result: TapResult | FlickResult) {
 }
 
 // The gesture layer tells taps from Flicks. The core decides whether they hit the Monster.
-listenForGestures(canvas, (clientX, clientY) => renderer.toArena(clientX, clientY), {
+// The game canvas is hidden while drawing, so these only fire during a Catch.
+listenForGestures(canvas, (clientX, clientY) => renderer!.toArena(clientX, clientY), {
   onTap(at) {
+    if (!renderer) return;
     if (caughtAt !== undefined) {
-      if (performance.now() - caughtAt > NEW_CATCH_AFTER_MS) startCatch();
+      if (performance.now() - caughtAt > NEW_ROUND_AFTER_MS) startRound();
       return;
     }
     const result = core.bonk(at);
@@ -78,7 +100,7 @@ listenForGestures(canvas, (clientX, clientY) => renderer.toArena(clientX, client
     noteIfCaught(result);
   },
   onFlick(path) {
-    if (caughtAt !== undefined) return;
+    if (!renderer || caughtAt !== undefined) return;
     const result = core.flick(path);
     renderer.showFlick(result, path);
     playFor(result);
@@ -91,7 +113,7 @@ function frame(now: number) {
   const dt = last === undefined ? 0 : Math.min((now - last) / 1000, MAX_DT);
   last = now;
   playFor(core.tick(dt));
-  renderer.draw(dt);
+  renderer?.draw(dt);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

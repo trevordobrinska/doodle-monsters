@@ -12,13 +12,13 @@ describe("a Flick", () => {
 
   it("that misses does nothing", () => {
     const core = buildCore();
-    const { x, y, radius } = core.monster();
+    const { x, y, width } = core.monster();
     const before = core.monster();
 
     // A swipe well above the Monster, passing it by.
     const result = core.flick([
-      { x: x - radius * 2, y: y - radius * 3 },
-      { x: x + radius * 2, y: y - radius * 3 },
+      { x: x - width, y: y - width * 1.5 },
+      { x: x + width, y: y - width * 1.5 },
     ]);
 
     expect(result).toBe("miss");
@@ -46,8 +46,8 @@ describe("a Flick", () => {
 
     runUntil(core, () => !core.monster().flying, 5);
 
-    const { x, radius } = core.monster();
-    expect(x + radius).toBeCloseTo(core.arena.width);
+    const { x, width } = core.monster();
+    expect(x + width / 2).toBeCloseTo(core.arena.width);
     expect(core.monster().y).toBeCloseTo(y);
   });
 

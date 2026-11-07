@@ -19,7 +19,8 @@ export interface Renderer {
 }
 
 const INK = "#2b2b40";
-const BODY = "#7ed957";
+/** Eyelids on the stand-in eyes, when sleepy. */
+const LID = "#d9d4e8";
 const FLOOR = "#fff8e7";
 const STAR_COLORS = ["#ffd23f", "#ff8c42", "#ff5d8f", "#4cc9f0"];
 
@@ -56,10 +57,18 @@ interface Popup {
   maxLife: number;
 }
 
+/** Half the Monster's width and height: from its centre to the edges of its drawing. */
+const halfW = (m: MonsterView) => m.width / 2;
+const halfH = (m: MonsterView) => m.height / 2;
+
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
-export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Renderer {
+/**
+ * `image` is the kid's drawing, trimmed to its ink. It's drawn stretched to
+ * the Monster's size from the core, so what you see is what you can hit.
+ */
+export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image: CanvasImageSource): Renderer {
   const maybeCtx = canvas.getContext("2d");
   if (!maybeCtx) throw new Error("2D canvas is not supported");
   const ctx: CanvasRenderingContext2D = maybeCtx;
@@ -122,8 +131,8 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
     switch (result) {
       case "bonk":
         squash = SQUASH_SECONDS;
-        burst({ x: m.x, y: m.y - m.radius * 0.3 }, 8, 380);
-        popups.push({ text: "BONK!", x: m.x, y: m.y - m.radius - 20, life: 0.7, maxLife: 0.7 });
+        burst({ x: m.x, y: m.y - halfH(m) * 0.3 }, 8, 380);
+        popups.push({ text: "BONK!", x: m.x, y: m.y - halfH(m) - 20, life: 0.7, maxLife: 0.7 });
         break;
       case "boing":
         popups.push({ text: "boing", x: at.x, y: at.y - 30, life: 0.5, maxLife: 0.5 });
@@ -131,7 +140,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       case "caught":
         caughtFor = 0;
         burst({ x: m.x, y: m.y }, 16, 520);
-        popups.push({ text: "Caught!", x: m.x, y: m.y - m.radius * 2, life: 2.5, maxLife: 2.5 });
+        popups.push({ text: "Caught!", x: m.x, y: m.y - halfH(m) * 2 - 30, life: 2.5, maxLife: 2.5 });
         break;
       case "miss":
         break;
@@ -148,7 +157,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
         // `flying`, so note it here or the wall bump would be skipped.
         wasFlying = true;
         burst({ x: m.x, y: m.y }, 6, 300);
-        popups.push({ text: "FLICK!", x: m.x, y: m.y - m.radius - 20, life: 0.8, maxLife: 0.8 });
+        popups.push({ text: "FLICK!", x: m.x, y: m.y - halfH(m) - 20, life: 0.8, maxLife: 0.8 });
         break;
       case "boing":
       case "caught":
@@ -165,17 +174,17 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       const { width, height } = core.arena;
       // The wall it is touching, from where it stopped.
       const gaps = [
-        { gap: width - m.radius - m.x, angle: 0 },
-        { gap: height - m.radius - m.y, angle: Math.PI / 2 },
-        { gap: m.x - m.radius, angle: Math.PI },
-        { gap: m.y - m.radius, angle: -Math.PI / 2 },
+        { gap: width - halfW(m) - m.x, angle: 0 },
+        { gap: height - halfH(m) - m.y, angle: Math.PI / 2 },
+        { gap: m.x - halfW(m), angle: Math.PI },
+        { gap: m.y - halfH(m), angle: -Math.PI / 2 },
       ];
       wallAngle = gaps.reduce((a, b) => (b.gap < a.gap ? b : a)).angle;
       wallBump = WALL_BUMP_SECONDS;
-      const wallX = m.x + Math.cos(wallAngle) * m.radius;
-      const wallY = m.y + Math.sin(wallAngle) * m.radius;
+      const wallX = m.x + Math.cos(wallAngle) * halfW(m);
+      const wallY = m.y + Math.sin(wallAngle) * halfH(m);
       burst({ x: wallX, y: wallY }, 10, 420);
-      popups.push({ text: "THUD!", x: m.x, y: m.y - m.radius - 20, life: 0.7, maxLife: 0.7 });
+      popups.push({ text: "THUD!", x: m.x, y: m.y - halfH(m) - 20, life: 0.7, maxLife: 0.7 });
     }
     wasFlying = m.flying;
   }
@@ -266,26 +275,25 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       const t = 1 - wallBump / WALL_BUMP_SECONDS; // 0 → 1
       const amount = Math.cos(t * Math.PI * 2.5) * (1 - t) * 0.4;
       ctx.rotate(wallAngle);
-      ctx.translate(m.radius * amount, 0);
+      // Distance from the centre to the wall-side edge.
+      const toWall = Math.abs(Math.cos(wallAngle)) * halfW(m) + Math.abs(Math.sin(wallAngle)) * halfH(m);
+      ctx.translate(toWall * amount, 0);
       ctx.scale(1 - amount, 1 + amount * 0.6);
       ctx.rotate(-wallAngle);
     }
     ctx.scale(sx, sy);
     if (m.stunned && squash === 0 && wallBump === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
 
-    const r = m.radius;
-    ctx.fillStyle = BODY;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
 
+    // Stand-in eyes near the top of the drawing, so spiral and sleepy eyes
+    // still show. The kid's own Googly Eyes replace these in ticket 07.
+    const r = Math.min(halfW(m), halfH(m));
+    ctx.strokeStyle = INK;
     for (const side of [-1, 1]) {
-      const ex = side * r * 0.35;
-      const ey = -r * 0.2;
-      const er = r * 0.25;
+      const ex = side * Math.min(halfW(m) * 0.4, r * 0.45);
+      const ey = -halfH(m) * 0.45;
+      const er = Math.max(10, r * 0.28);
       ctx.fillStyle = "#ffffff";
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -299,11 +307,11 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
         const look = speed > 0 ? er * 0.35 : 0;
         ctx.fillStyle = INK;
         ctx.beginPath();
-        ctx.arc(ex + Math.cos(heading) * look, ey + Math.sin(heading) * look, r * 0.11, 0, Math.PI * 2);
+        ctx.arc(ex + Math.cos(heading) * look, ey + Math.sin(heading) * look, er * 0.4, 0, Math.PI * 2);
         ctx.fill();
         if (m.sleepy) {
           // Droopy eyelids.
-          ctx.fillStyle = BODY;
+          ctx.fillStyle = LID;
           ctx.beginPath();
           ctx.arc(ex, ey, er + 1.5, Math.PI, Math.PI * 2);
           ctx.fill();
@@ -322,7 +330,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       ctx.textAlign = "center";
       const zz = (time * 0.8) % 1;
       ctx.globalAlpha = 1 - zz;
-      ctx.fillText("z", m.x + m.radius * 0.8 + zz * 20, m.y - m.radius - zz * 40);
+      ctx.fillText("z", m.x + halfW(m) * 0.8 + zz * 20, m.y - halfH(m) - zz * 40);
       ctx.globalAlpha = 1;
     }
   }
@@ -367,15 +375,16 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
   function drawOrbitingStars(m: MonsterView) {
     for (let i = 0; i < 3; i++) {
       const a = time * 5 + (i * Math.PI * 2) / 3;
-      const x = m.x + Math.cos(a) * m.radius * 0.9;
-      const y = m.y - m.radius * 1.05 + Math.sin(a) * m.radius * 0.25;
+      const x = m.x + Math.cos(a) * halfW(m) * 0.9;
+      const y = m.y - halfH(m) * 1.05 + Math.sin(a) * halfH(m) * 0.25;
       drawStar(x, y, 12, a, STAR_COLORS[i]);
     }
   }
 
   function drawBubble(m: MonsterView) {
     const grow = Math.min(caughtFor / 0.3, 1);
-    const r = m.radius * (1.1 + 0.45 * grow);
+    // Big enough to hold the whole drawing, corners and all.
+    const r = Math.hypot(halfW(m), halfH(m)) * (1 + 0.2 * grow);
     const y = m.y + bubbleBob(m);
     ctx.save();
     ctx.globalAlpha = 0.35;

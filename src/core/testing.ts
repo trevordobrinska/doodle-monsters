@@ -1,4 +1,4 @@
-import { createGameCore, type GameCore, type Point, type TickResult } from "./gameCore";
+import { createGameCore, type GameCore, type InkFacts, type Point, type TickResult } from "./gameCore";
 import { seededDice, type Clock } from "./deps";
 
 /** A clock that only moves when the test says so. */
@@ -12,9 +12,19 @@ export function fakeClock(start = 0): Clock & { advance(ms: number): void } {
   };
 }
 
+/** A roundish drawing with plenty of ink. */
+export const A_DRAWING: InkFacts = { width: 400, height: 400, inkAmount: 50_000, mainColor: "purple" };
+
 /** Builds a game core with a fake clock and seeded dice, so every run is the same. */
-export function buildCore(seed = 1): GameCore {
+export function newRound(seed = 1): GameCore {
   return createGameCore({ clock: fakeClock(), dice: seededDice(seed) });
+}
+
+/** A Round whose drawing is finished, so its Catch has begun. */
+export function buildCore(seed = 1, drawing: InkFacts = A_DRAWING): GameCore {
+  const core = newRound(seed);
+  if (!core.finishDrawing(drawing)) throw new Error("The drawing wasn't accepted");
+  return core;
 }
 
 /** Advances the core by `seconds`, in steps of about one 60 fps frame. */
@@ -42,11 +52,11 @@ export function tapMonster(core: GameCore) {
 
 /** A quick swipe from left to right straight through the middle of the Monster. */
 export function swipeAcross(core: GameCore): Point[] {
-  const { x, y, radius } = core.monster();
+  const { x, y, width } = core.monster();
   return [
-    { x: x - radius * 2, y },
+    { x: x - width, y },
     { x, y },
-    { x: x + radius * 2, y },
+    { x: x + width, y },
   ];
 }
 
