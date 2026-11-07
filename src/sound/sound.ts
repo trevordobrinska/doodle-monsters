@@ -19,10 +19,10 @@ export interface Sound {
 
 /** Each effect's file under `public/sounds/`. See CREDITS.md for where they come from. */
 const FILES: Record<Effect, string> = {
-  bonk: "sounds/bonk.ogg",
-  boing: "sounds/boing.ogg",
-  wallHit: "sounds/wall-hit.ogg",
-  caught: "sounds/caught.ogg",
+  bonk: "sounds/bonk.wav",
+  boing: "sounds/boing.wav",
+  wallHit: "sounds/wall-hit.wav",
+  caught: "sounds/caught.wav",
 };
 
 /** Overall loudness, so effects don't startle. */
