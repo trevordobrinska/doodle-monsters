@@ -16,14 +16,16 @@ describe("the Monster in the arena", () => {
     const core = buildCore();
     const { width, height } = core.arena;
     const seen = { left: false, right: false, top: false, bottom: false };
+    // A wall bounce can happen between frames, so "at the wall" means within one frame's travel.
+    const near = 10;
 
     runFor(core, 30, () => {
       expectInsideArena(core);
       const m = core.monster();
-      if (m.x - m.width / 2 <= 1) seen.left = true;
-      if (m.x + m.width / 2 >= width - 1) seen.right = true;
-      if (m.y - m.height / 2 <= 1) seen.top = true;
-      if (m.y + m.height / 2 >= height - 1) seen.bottom = true;
+      if (m.x - m.width / 2 <= near) seen.left = true;
+      if (m.x + m.width / 2 >= width - near) seen.right = true;
+      if (m.y - m.height / 2 <= near) seen.top = true;
+      if (m.y + m.height / 2 >= height - near) seen.bottom = true;
     });
 
     // Over 30 seconds it should have travelled to, and come back from, every wall.

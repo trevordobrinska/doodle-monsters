@@ -35,6 +35,24 @@ if (!bringToLifeRoot) throw new Error("Missing #bring-to-life");
 
 const sound = createSound();
 
+// Hard mode is remembered on this tablet from Round to Round. It's a setting,
+// not part of the Zoo, so it doesn't go through Zoo storage.
+const HARD_MODE_KEY = "doodle-monsters:hard-mode";
+function savedHardMode(): boolean {
+  try {
+    return localStorage.getItem(HARD_MODE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+function saveHardMode(on: boolean) {
+  try {
+    localStorage.setItem(HARD_MODE_KEY, on ? "on" : "off");
+  } catch {
+    // Storage unavailable: hard mode just won't be remembered.
+  }
+}
+
 /** The sound each result the core reports makes, if any. A Flick sounds when it hits the wall. */
 const EFFECT_FOR: Partial<Record<TapResult | FlickResult | TickResult, Effect>> = {
   bonk: "bonk",
@@ -63,6 +81,7 @@ const drawScreen = createDrawScreen(drawScreenRoot, {
 const bringToLifeScreen = createBringToLifeScreen(bringToLifeRoot, {
   core: () => core,
   onStart: startCatch,
+  onHardModeChange: saveHardMode,
 });
 /** The kid's finished drawing, kept from Bring to life for the Catch. */
 let monsterImage: HTMLCanvasElement | undefined;
@@ -70,6 +89,7 @@ let monsterImage: HTMLCanvasElement | undefined;
 /** A new Round begins on the drawing screen. */
 function startRound() {
   core = createGameCore({ clock: systemClock, dice: randomDice });
+  core.setHardMode(savedHardMode());
   renderer = undefined;
   caughtAt = undefined;
   monsterImage = undefined;
@@ -102,7 +122,9 @@ function noteIfCaught(result: TapResult | FlickResult) {
   if (result !== "caught") return;
   caughtAt = performance.now();
   // Handy while tuning: a normal Catch should take about 30–60 s.
-  console.info(`Caught in ${((caughtAt - catchStartedAt) / 1000).toFixed(1)} s`);
+  const { temperament } = core.monster();
+  const mode = core.hardMode() ? "hard" : "normal";
+  console.info(`Caught ${temperament} (${mode}) in ${((caughtAt - catchStartedAt) / 1000).toFixed(1)} s`);
 }
 
 // The gesture layer tells taps from Flicks. The core decides whether they hit the Monster.

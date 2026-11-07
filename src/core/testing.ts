@@ -1,5 +1,6 @@
 import { createGameCore, type GameCore, type InkFacts, type Point, type TickResult } from "./gameCore";
 import { seededDice, type Clock } from "./deps";
+import type { Temperament } from "./temperaments";
 
 /** A clock that only moves when the test says so. */
 export function fakeClock(start = 0): Clock & { advance(ms: number): void } {
@@ -20,12 +21,22 @@ export function newRound(seed = 1): GameCore {
   return createGameCore({ clock: fakeClock(), dice: seededDice(seed) });
 }
 
+export interface CatchOptions {
+  temperament?: Temperament;
+  hardMode?: boolean;
+}
+
 /** A Round whose drawing is finished and brought to life, so its Catch has begun. */
-export function buildCore(seed = 1, drawing: InkFacts = A_DRAWING): GameCore {
+export function buildCore(
+  seed = 1,
+  drawing: InkFacts = A_DRAWING,
+  { temperament = "speedy", hardMode = false }: CatchOptions = {},
+): GameCore {
   const core = newRound(seed);
+  core.setHardMode(hardMode);
   if (!core.finishDrawing(drawing)) throw new Error("The drawing wasn't accepted");
   core.placeEye({ x: 0.5, y: 0.3 });
-  core.pickTemperament("speedy");
+  core.pickTemperament(temperament);
   if (!core.startCatch()) throw new Error("The Catch didn't start");
   return core;
 }
@@ -77,4 +88,16 @@ export function runUntil(core: GameCore, done: () => boolean, maxSeconds = 600):
 export function speedOf(core: GameCore): number {
   const { vx, vy } = core.monster();
   return Math.hypot(vx, vy);
+}
+
+/** How far the Monster travels over `seconds`, in pixels, following its path frame by frame. */
+export function groundCovered(core: GameCore, seconds: number): number {
+  let { x, y } = core.monster();
+  let total = 0;
+  runFor(core, seconds, () => {
+    const now = core.monster();
+    total += Math.hypot(now.x - x, now.y - y);
+    ({ x, y } = now);
+  });
+  return total;
 }

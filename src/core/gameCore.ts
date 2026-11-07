@@ -1,5 +1,5 @@
 import type { Clock, Dice } from "./deps";
-import type { Temperament } from "./temperaments";
+import { BEHAVIORS, tighten, type Behavior, type Temperament } from "./temperaments";
 import { NAME_WORDS } from "./nameWords";
 
 export interface Arena {
@@ -110,6 +110,9 @@ export interface GameCore {
   moveEye(id: number, to: Point): void;
   removeEye(id: number): void;
   pickTemperament(temperament: Temperament): void;
+  /** Hard mode tightens every Temperament, for older kids. */
+  setHardMode(on: boolean): void;
+  hardMode(): boolean;
   /** The Monster's name, as generated or typed. Empty until its drawing is done. */
   name(): string;
   /** 🎲: swaps the name for a different generated one. */
@@ -145,24 +148,29 @@ const ARENA: Arena = { width: 1280, height: 800 };
  * so a tiny or huge drawing doesn't make a Catch unfair.
  */
 const MONSTER_SIZE = 150;
-const MONSTER_SPEED = 320; // pixels per second
 /** Taps this far outside the Monster's edge still land, for small fingers. */
 const TOUCH_SLOP = 16;
-const STUNNED_SECONDS = 1;
 const FULL_DIZZY = 6;
-/** Extra speed right after a dash, as a fraction of normal speed. */
-const DASH_BOOST = 0.8;
 /** How long the dash boost takes to fade back to normal speed. */
 const DASH_SECONDS = 1.5;
-/** Dizzy starts draining after this long without a Bonk... */
+/** A zigzagging Monster heads off somewhere new this often... */
+const ZIGZAG_SECONDS = 1.2;
+/** ...turning by somewhere between these many degrees. */
+const ZIGZAG_TURN = { min: 40, max: 110 };
+/** One hop of a hopping Monster takes this long... */
+const HOP_SECONDS = 0.5;
+/** ...slowing to this fraction of its speed between hops and peaking at this much mid-hop. */
+const HOP_SPEED = { least: 0.25, most: 1.45 };
+/** Dizzy starts draining after this long without a Bonk, then loses a step as often as the Temperament says. */
 const DRAIN_DELAY_SECONDS = 3;
-/** ...and then loses one step this often. */
-const DRAIN_STEP_SECONDS = 1.5;
 /** How fast a Flick flings the Monster towards a wall. */
 const FLICK_SPEED = 1600; // pixels per second
 /** A Flick counts as two Bonks: a design rule, not a tuning number. */
 const FLICK_DIZZY_STEPS = 2;
-/** A Catch can't fail: after this long the Monster gets sleepy... */
+/**
+ * A Catch can't fail: after this long the Monster gets sleepy, and its Dizzy
+ * stops draining, so even the slowest taps add up...
+ */
 const SLEEPY_AFTER_SECONDS = 120;
 /** ...and over this long slows down to this fraction of its speed. */
 const SLEEPY_SLOWDOWN_SECONDS = 10;
@@ -201,9 +209,11 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let flying = false; // flung by a Flick, heading along dirX/dirY until a wall
   let dashLeft = 0; // seconds of dash boost still to go
   let drainIn = 0; // seconds until Dizzy next loses a step
+  let zigzagIn = ZIGZAG_SECONDS; // seconds until a zigzagging Monster turns
   let caught = false;
   let catchSeconds = 0; // how long this Catch has been going
   const readyToCatch = () => dizzy >= FULL_DIZZY;
+  const sleepy = () => catchSeconds >= SLEEPY_AFTER_SECONDS;
   let phase: Phase = "draw";
   let width = 0;
   let height = 0;
@@ -212,6 +222,14 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let nextEyeId = 1;
   let temperament: Temperament | undefined;
   let name = "";
+  let hardMode = false;
+  /** How it behaves during its Catch: its Temperament's, tightened in hard mode. */
+  function behavior(): Behavior {
+    // Only asked once the Catch has begun, which needs a Temperament; the
+    // fallback just keeps the types happy.
+    const own = BEHAVIORS[temperament ?? "speedy"];
+    return hardMode ? tighten(own) : own;
+  }
   const bringingToLife = () => phase === "bringToLife";
   const canStartCatch = () => bringingToLife() && eyes.length >= MIN_EYES && temperament !== undefined && name.trim() !== "";
   /** There's a Monster to Bonk and Flick: its Catch has begun and isn't over. */
@@ -222,7 +240,27 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   function speed() {
     if (stunnedLeft > 0 || caught) return 0;
     if (flying) return FLICK_SPEED;
-    return MONSTER_SPEED * (1 + DASH_BOOST * (dashLeft / DASH_SECONDS)) * sleepiness();
+    const { speed, dashBoost } = behavior();
+    return speed * (1 + dashBoost * (dashLeft / DASH_SECONDS)) * hopping() * sleepiness();
+  }
+
+  /** A hopping Monster's speed rises and falls with each hop. Others keep a steady 1. */
+  function hopping() {
+    if (behavior().wander !== "hop") return 1;
+    const midHop = Math.abs(Math.sin((Math.PI * catchSeconds) / HOP_SECONDS));
+    return HOP_SPEED.least + (HOP_SPEED.most - HOP_SPEED.least) * midHop;
+  }
+
+  /** A zigzagging Monster turns off to one side or the other every so often. */
+  function zigzag(dt: number) {
+    if (behavior().wander !== "zigzag") return;
+    zigzagIn -= dt;
+    if (zigzagIn > 0) return;
+    zigzagIn += ZIGZAG_SECONDS;
+    const turn = ((ZIGZAG_TURN.min + dice.roll() * (ZIGZAG_TURN.max - ZIGZAG_TURN.min)) * Math.PI) / 180;
+    const heading = Math.atan2(dirY, dirX) + turn * randomSign();
+    dirX = Math.cos(heading);
+    dirY = Math.sin(heading);
   }
 
   /** 1 while wide awake, easing down to SLEEPY_SPEED once the Catch runs long. */
@@ -248,7 +286,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     y += dirY * travel;
     if (travel < step) {
       flying = false;
-      stunnedLeft = STUNNED_SECONDS;
+      stunnedLeft = behavior().stunnedSeconds;
       return "wallHit";
     }
     return "none";
@@ -281,12 +319,13 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   }
 
   function drainDizzy(dt: number) {
-    // A fully Dizzy Monster waits for its catching tap rather than recovering.
-    if (dizzy === 0 || readyToCatch()) return;
+    // A fully Dizzy Monster waits for its catching tap rather than recovering,
+    // and a sleepy one is too tired to recover.
+    if (dizzy === 0 || readyToCatch() || sleepy()) return;
     drainIn -= dt;
     while (drainIn <= 0 && dizzy > 0) {
       dizzy -= 1;
-      drainIn += DRAIN_STEP_SECONDS;
+      drainIn += behavior().drainStepSeconds;
     }
   }
 
@@ -322,6 +361,10 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     pickTemperament(picked) {
       if (bringingToLife()) temperament = picked;
     },
+    setHardMode(on) {
+      hardMode = on;
+    },
+    hardMode: () => hardMode,
     name: () => name,
     rerollName() {
       if (!bringingToLife()) return;
@@ -350,6 +393,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
         return "none";
       }
       if (flying) return flyTowardsWall(dt);
+      zigzag(dt);
       const frameSpeed = speed();
       dashLeft = Math.max(0, dashLeft - dt);
       x += dirX * frameSpeed * dt;
@@ -374,7 +418,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       stunned: stunnedLeft > 0,
       flying,
       readyToCatch: readyToCatch(),
-      sleepy: catchSeconds >= SLEEPY_AFTER_SECONDS,
+      sleepy: sleepy(),
       caught,
       voice,
     }),
@@ -384,7 +428,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       if (early) return early;
       dizzy += 1;
       drainIn = DRAIN_DELAY_SECONDS;
-      stunnedLeft = STUNNED_SECONDS;
+      stunnedLeft = behavior().stunnedSeconds;
       return "bonk";
     },
     flick(path) {

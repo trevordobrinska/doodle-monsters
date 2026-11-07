@@ -6,14 +6,17 @@ import { createPupil, drawGooglyEye, eyeRadius, type Pupil } from "../render/goo
  * The Bring to life screen, between drawing and the Catch: the kid sticks
  * Googly Eyes on their drawing (tap to stick, drag to move, drag off the
  * Monster to take one off), picks a Temperament and keeps, rerolls or types
- * a name. Every rule (how many eyes, what's needed to start) is the core's;
- * this screen just sends it the kid's choices and shows what it says.
+ * a name. Hard mode can be flipped here too. Every rule (how many eyes,
+ * what's needed to start) is the core's; this screen just sends it the kid's
+ * choices and shows what it says.
  */
 export interface BringToLifeOptions {
   /** The current Round's core. It changes each Round. */
   core(): GameCore;
   /** "Catch it!" was pressed. */
   onStart(): void;
+  /** Hard mode was flipped on or off, so it can be remembered. */
+  onHardModeChange(on: boolean): void;
 }
 
 export interface BringToLifeScreen {
@@ -56,6 +59,7 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
       </div>
       <div class="label">Temperament</div>
       <div class="temperaments"></div>
+      <button class="hard-mode" aria-pressed="false">💪 Hard mode: <span>off</span></button>
       <button class="start">Catch it! ▶</button>
     </div>
   `;
@@ -67,6 +71,7 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
   const rerollButton = root.querySelector<HTMLButtonElement>(".reroll")!;
   const temperamentsBox = root.querySelector<HTMLElement>(".temperaments")!;
   const startButton = root.querySelector<HTMLButtonElement>(".start")!;
+  const hardModeButton = root.querySelector<HTMLButtonElement>(".hard-mode")!;
 
   const core = () => options.core();
   let image: HTMLCanvasElement | undefined;
@@ -112,6 +117,12 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
     update();
   });
 
+  hardModeButton.addEventListener("click", () => {
+    core().setHardMode(!core().hardMode());
+    options.onHardModeChange(core().hardMode());
+    update();
+  });
+
   startButton.addEventListener("click", () => {
     if (drag || !core().canStartCatch()) return;
     options.onStart();
@@ -122,6 +133,9 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
     const picked = c.monster().temperament;
     for (const b of temperamentButtons) b.classList.toggle("chosen", b.dataset.temperament === picked);
     startButton.disabled = !c.canStartCatch();
+    hardModeButton.classList.toggle("on", c.hardMode());
+    hardModeButton.setAttribute("aria-pressed", String(c.hardMode()));
+    hardModeButton.querySelector("span")!.textContent = c.hardMode() ? "ON" : "off";
     const count = c.eyes().length;
     hint.innerHTML =
       count === 0
