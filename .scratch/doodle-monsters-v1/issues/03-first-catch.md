@@ -15,7 +15,7 @@
 - [x] Each rule above has a test through the core's interface (events + `tick(dt)`), with no rendering in tests
 - [x] Renderer: squash and stretch with stars on a Bonk, wobble while Stunned, a visible Dizzy meter, spiral eyes at full Dizzy, the bubble on catch
 - [x] Rendering layer turns pointer events into Bonk events; hit-testing is done by the core
-- [ ] A normal Catch takes roughly 30–60 s when playtested in Chrome's device toolbar (tuning numbers are starting points)
+- [x] A normal Catch takes roughly 30–60 s when playtested in Chrome's device toolbar (tuning numbers are starting points)
 
 ## Comments
 
@@ -26,3 +26,4 @@
 
 Still open: a human needs to playtest the 30�60 s target in Chrome's device toolbar. The review also noted that gesture handling (`main.ts`) needs a proper home when Flick arrives in ticket 04.
 
+**2026-11-07 (human):** Playtested in the browser's device toolbar: passes.

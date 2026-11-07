@@ -11,7 +11,7 @@
 - [x] Core: a Flick while Stunned adds no Dizzy (same rule as a Bonk); a Flick that misses does nothing
 - [x] Core tests for "a Flick adds two steps", "a Flick that misses does nothing" and "a Flick while Stunned adds nothing"
 - [x] The wall hit has a visible bump (squash against the wall)
-- [ ] Playtested in Chrome's device toolbar: taps aren't mistaken for Flicks and vice versa
+- [x] Playtested in Chrome's device toolbar: taps aren't mistaken for Flicks and vice versa
 
 ## Comments
 
@@ -21,3 +21,5 @@
 - A finger is judged when it lifts, because that's the only way to tell a tap from a swipe. So Bonks now land on finger-up, not finger-down. Moves of 24–60 px, and slow drags, do nothing.
 
 Still open: a human needs to playtest in Chrome's device toolbar. Things to watch: does the finger-up Bonk feel late? Are taps ever taken for Flicks, or Flicks for taps? The hit-test checks the whole swipe path against where the Monster is when the finger lifts, and the Monster can move about 100–200 px during a 350 ms swipe. If good swipes miss, check each part of the path against where the Monster was at that moment.
+
+**2026-11-07 (human):** Playtested in the browser's device toolbar: passes.
