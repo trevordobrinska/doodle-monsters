@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 (First Catch).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] Full-screen drawing canvas with smooth finger strokes
 - [x] About 8 bright colors, a thick brush and a thin brush
@@ -30,3 +30,4 @@ Known rough edges to check while playtesting:
 
 Smoke-tested in headless Edge at 960×600 (the Fire HD 8's CSS size), with no console errors. It still needs a human playtest for how drawing with a finger feels.
 
+**2026-11-07 (human):** Playtested: passes.
