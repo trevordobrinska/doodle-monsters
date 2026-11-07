@@ -4,7 +4,7 @@
 
 **Blocked by:** 07 (Bring it to life).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The app opens to the Zoo Habitat with a big "Draw a Monster!" button that starts a Round
 - [x] An empty Zoo shows an arrow pointing at the button
@@ -31,3 +31,5 @@ It still needs a human playtest in Chrome's device toolbar. Check:
 - the arrow and "Draw a Monster!" button are obvious to the 7-year-old;
 - 3.5 s in the bubble before the Zoo feels right;
 - eyes following the finger reads as "watching me".
+
+**2026-11-07 (human):** Playtested in the browser. Looks good.
