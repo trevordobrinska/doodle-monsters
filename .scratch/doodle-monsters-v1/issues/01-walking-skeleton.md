@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Vite + TypeScript + Vitest project scaffold; `npm test` and `npm run build` both work
 - [ ] Game core is pure TypeScript (no DOM/canvas), takes an injected clock and dice, advances with `tick(dt)`, and reports the blob's position
@@ -13,3 +13,7 @@
 - [ ] A test helper builds a core with a fake clock and seeded dice; at least one test proves wall bouncing through the core's interface
 - [ ] Pushing to the main branch publishes to GitHub Pages over HTTPS (the human creates/approves the GitHub repo and enables Pages; the agent must not create remotes or push without asking)
 - [ ] Looks right in desktop Chrome's device toolbar at 1280×800 with touch emulation
+
+## Comments
+
+**2026-11-07 (agent):** Code done: scaffold, pure game core with injected clock/dice, bouncing blob, canvas renderer + rAF loop, test helper and 2 core tests, Pages workflow (`.github/workflows/deploy.yml`, triggers on `main` or `master`). Remaining human steps: create the GitHub repo, add the remote and push, set Pages source to "GitHub Actions", then check the site at 1280×800 with touch emulation in Chrome's device toolbar. "blob" naming is a deliberate placeholder; rename to Monster when ticket 03 lands.
