@@ -1,0 +1,3 @@
+# Plain canvas and a hand-written game loop, no game framework
+
+Doodle Monsters draws on a plain `<canvas>` with its own game loop, motion, collision and touch-gesture code. It doesn't use a framework such as Phaser or Kaplay. A framework would get there faster, but the project's purpose is for me to sharpen my coding skills, and game fundamentals are exactly what a framework would hide. The scope is small (one Monster in a Catch, about 10 in a Habitat) and fits a hand-rolled engine, and keeping it lightweight suits the Fire HD 8's 2 GB of RAM. Don't "fix" this by adding a framework unless the learning goal changes.
