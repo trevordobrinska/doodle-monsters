@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (Draw your Monster).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The kid can place 1 to 5 Googly Eyes on the drawing and move or remove them; positions are stored relative to the image
 - [x] Temperament picker with the starting list (something like Speedy, Sneaky, Bouncy, Sturdy, Sleepy), each shown as a word plus an icon
@@ -27,3 +27,5 @@ Smoke-tested in headless Edge at 960×600 with touch: drawing, sticking on 3 eye
 - how strong the jiggle feels during open running (it's gentle between bounces);
 - that eyes feel big enough to grab with a finger;
 - what typing a name with the Fire's on-screen keyboard is like.
+
+**2026-11-07 (human):** Tested in the browser: looks good. A final feel pass on the device comes later.
