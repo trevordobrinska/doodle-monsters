@@ -11,3 +11,7 @@
 - [ ] Tuning numbers (Stunned length, Dizzy drain, dash speed, Flick thresholds, Temperament values) adjusted after playtesting on the device with the kids
 - [ ] Drawing and the Habitat with about 10 Monsters stay smooth on the device
 - [ ] Any device-only problems found via remote debugging are fixed or written up as new tickets
+
+## Comments
+
+**2026-11-07 (from ticket 08):** When tuning the Temperaments on the tablet, check Bouncy. In the desktop playtest its hops felt like a "lurch" rather than a bounce (its speed just rises and falls; it doesn't leave the ground). Also check that normal mode takes the 7-year-old about 30–60 s for every Temperament, and that the hard mode button isn't easy to hit by accident.

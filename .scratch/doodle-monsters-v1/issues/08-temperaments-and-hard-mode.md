@@ -4,14 +4,14 @@
 
 **Blocked by:** 07 (Bring it to life).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] Each Temperament is a set of numbers in the core (e.g. base speed, dash boost, Stunned length, Dizzy drain rate, wandering style)
 - [x] Hard mode applies one tightening to every Temperament
 - [x] A hard mode toggle a kid can find and flip; the choice is remembered
 - [x] Core tests compare behavior, not exact numbers: e.g. "a Speedy Monster moves faster than a Sleepy one", "Dizzy drains faster in hard mode"
 - [x] The sleepy slowdown after about 2 minutes still works for every Temperament and in hard mode (a Catch can't fail)
-- [ ] Each Temperament is playtested in Chrome's device toolbar to feel distinct
+- [x] Each Temperament is playtested in Chrome's device toolbar to feel distinct
 
 ## Comments
 
@@ -28,3 +28,5 @@ Not playtested in a browser by the agent. It still needs a human playtest in Chr
 - normal mode takes the 7-year-old about 30–60 s for every Temperament, Speedy and Sturdy most of all;
 - hard mode is a challenge for the 10-year-old but still catchable;
 - the hard mode button is easy to find and not easy to hit by accident.
+
+**2026-11-07 (human):** Tested in the browser. It's hard to judge the Temperaments with a mouse (and as an adult, not a 7-year-old). One note: Bouncy doesn't really feel like it's bouncing; it's more of a "lurch". Not fixing it yet: judge it on the tablet first (ticket 15).
