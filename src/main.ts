@@ -10,6 +10,7 @@ import { createRenderer, type Renderer } from "./render/renderer";
 import { listenForGestures } from "./input/gestures";
 import { createSound, type Effect } from "./sound/sound";
 import { createDrawScreen } from "./draw/drawScreen";
+import { createBringToLifeScreen } from "./bringToLife/bringToLifeScreen";
 import type { FinishedDrawing } from "./draw/drawing";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
@@ -29,6 +30,8 @@ const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");
 const drawScreenRoot = document.querySelector<HTMLElement>("#draw-screen");
 if (!drawScreenRoot) throw new Error("Missing #draw-screen");
+const bringToLifeRoot = document.querySelector<HTMLElement>("#bring-to-life");
+if (!bringToLifeRoot) throw new Error("Missing #bring-to-life");
 
 const sound = createSound();
 
@@ -54,23 +57,40 @@ let caughtAt: number | undefined;
 
 const drawScreen = createDrawScreen(drawScreenRoot, {
   enoughInk: (inkAmount) => core.enoughInk(inkAmount),
-  onDone: startCatch,
+  onDone: bringToLife,
 });
+
+const bringToLifeScreen = createBringToLifeScreen(bringToLifeRoot, {
+  core: () => core,
+  onStart: startCatch,
+});
+/** The kid's finished drawing, kept from Bring to life for the Catch. */
+let monsterImage: HTMLCanvasElement | undefined;
 
 /** A new Round begins on the drawing screen. */
 function startRound() {
   core = createGameCore({ clock: systemClock, dice: randomDice });
   renderer = undefined;
   caughtAt = undefined;
+  monsterImage = undefined;
   canvas!.hidden = true;
+  bringToLifeScreen.hide();
   drawScreen.show();
 }
 
-function startCatch({ image, ink }: FinishedDrawing) {
+/** The drawing is done: on to Googly Eyes, a Temperament and a name. */
+function bringToLife({ image, ink }: FinishedDrawing) {
   if (!core.finishDrawing(ink)) return;
+  monsterImage = image;
   drawScreen.hide();
+  bringToLifeScreen.show(image);
+}
+
+function startCatch() {
+  if (!monsterImage || !core.startCatch()) return;
+  bringToLifeScreen.hide();
   canvas!.hidden = false;
-  renderer = createRenderer(canvas!, core, image);
+  renderer = createRenderer(canvas!, core, monsterImage);
   renderer.resize();
   catchStartedAt = performance.now();
 }

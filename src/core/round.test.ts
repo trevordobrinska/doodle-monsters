@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import { A_DRAWING, buildCore, newRound, runFor } from "./testing";
 
 describe("the Round", () => {
-  it("starts in Draw and moves to Catch when a drawing is finished", () => {
+  it("goes Draw, then Bring to life, then Catch", () => {
     const core = newRound();
     expect(core.phase()).toBe("draw");
 
     expect(core.finishDrawing(A_DRAWING)).toBe(true);
+    expect(core.phase()).toBe("bringToLife");
 
+    core.placeEye({ x: 0.5, y: 0.3 });
+    core.pickTemperament("speedy");
+    expect(core.startCatch()).toBe(true);
     expect(core.phase()).toBe("catch");
   });
 

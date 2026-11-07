@@ -1,4 +1,5 @@
 import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
+import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, type Pupil } from "./googlyEyes";
 
 /**
  * Draws the core's state onto a canvas. Holds no game rules: everything it
@@ -19,8 +20,6 @@ export interface Renderer {
 }
 
 const INK = "#2b2b40";
-/** Eyelids on the stand-in eyes, when sleepy. */
-const LID = "#d9d4e8";
 const FLOOR = "#fff8e7";
 const STAR_COLORS = ["#ffd23f", "#ff8c42", "#ff5d8f", "#4cc9f0"];
 
@@ -30,6 +29,12 @@ const SQUASH_SECONDS = 0.45;
 const WALL_BUMP_SECONDS = 0.5;
 /** Seconds a Flick's swoosh trail lingers. */
 const SWOOSH_SECONDS = 0.35;
+/** A running Monster hops a little, which rattles its Googly Eyes. Hops per second at normal speed... */
+const HOPS_PER_SECOND = 3;
+/** ...and how high, in arena units. */
+const HOP_HEIGHT = 5;
+/** The speed (px/s) HOP_HEIGHT and HOPS_PER_SECOND are for. */
+const HOP_SPEED = 320;
 
 interface Particle {
   x: number;
@@ -61,6 +66,12 @@ interface Popup {
 const halfW = (m: MonsterView) => m.width / 2;
 const halfH = (m: MonsterView) => m.height / 2;
 
+/** 0 when standing still, up to 1 at normal running speed: how hard it hops. */
+const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP_SPEED);
+
+/** Each eye of a face gets a slightly different springiness (0.8–1.2), so they don't jiggle in step. */
+const springinessFor = (eyeIndex: number) => 0.8 + ((eyeIndex * 0.37) % 0.4);
+
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
@@ -85,6 +96,8 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
   let wallBump = 0; // seconds left of the squash against a wall
   let wallAngle = 0; // direction from the Monster towards the wall it hit
   let wasFlying = false;
+  let hopPhase = 0; // how far through its hops the Monster is, in hops
+  const pupils = new Map<number, Pupil>();
   const swooshes: Swoosh[] = [];
   const particles: Particle[] = [];
   const popups: Popup[] = [];
@@ -198,7 +211,10 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       swooshes[i].life -= dt;
       if (swooshes[i].life <= 0) swooshes.splice(i, 1);
     }
-    if (core.monster().caught) caughtFor += dt;
+    const m = core.monster();
+    if (m.caught) caughtFor += dt;
+    hopPhase += dt * HOPS_PER_SECOND * hopStrength(m);
+    jiggleEyes(m, dt);
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life -= dt;
@@ -238,6 +254,31 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     drawDizzyMeter(m, width);
   }
 
+  /** How high the Monster is hopping right now, as an upwards offset in arena units. */
+  function hop(m: MonsterView) {
+    if (m.stunned || m.caught || m.flying) return 0;
+    return Math.abs(Math.sin(hopPhase * Math.PI)) * HOP_HEIGHT * hopStrength(m);
+  }
+
+  /** Where the Monster's centre is drawn this frame. */
+  function drawnAt(m: MonsterView): Point {
+    return { x: m.x, y: m.y + bubbleBob(m) - hop(m) };
+  }
+
+  /**
+   * Googly Eyes jiggle when the Monster moves: whenever the way it's drawn
+   * moving changes (a wall bounce, a Bonk stopping it, a hop landing), its
+   * loose pupils get left behind and rattle around.
+   */
+  function jiggleEyes(m: MonsterView, dt: number) {
+    const at = drawnAt(m);
+    m.eyes.forEach((eye, i) => {
+      let pupil = pupils.get(eye.id);
+      if (!pupil) pupils.set(eye.id, (pupil = createPupil(springinessFor(i))));
+      pupil.follow(dt, at);
+    });
+  }
+
   /** Bob of the bubble once caught, so it floats. Visual only. */
   function bubbleBob(m: MonsterView) {
     return m.caught ? Math.sin(caughtFor * 2) * 8 - Math.min(caughtFor, 1) * 20 : 0;
@@ -264,7 +305,8 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     const heading = Math.atan2(m.vy, m.vx);
 
     ctx.save();
-    ctx.translate(m.x, m.y + bubbleBob(m));
+    const at = drawnAt(m);
+    ctx.translate(at.x, at.y);
     if (stretch > 0.01) {
       ctx.rotate(heading);
       ctx.scale(1 + stretch, 1 - stretch * 0.6);
@@ -286,42 +328,15 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
 
     ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
 
-    // Stand-in eyes near the top of the drawing, so spiral and sleepy eyes
-    // still show. The kid's own Googly Eyes replace these in ticket 07.
-    const r = Math.min(halfW(m), halfH(m));
-    ctx.strokeStyle = INK;
-    for (const side of [-1, 1]) {
-      const ex = side * Math.min(halfW(m) * 0.4, r * 0.45);
-      const ey = -halfH(m) * 0.45;
-      const er = Math.max(10, r * 0.28);
-      ctx.fillStyle = "#ffffff";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(ex, ey, er, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (hasSpiralEyes(m)) {
-        drawSpiral(ex, ey, er * 0.85, time * 6 * side);
-      } else {
-        // Pupils look where it's heading.
-        const look = speed > 0 ? er * 0.35 : 0;
-        ctx.fillStyle = INK;
-        ctx.beginPath();
-        ctx.arc(ex + Math.cos(heading) * look, ey + Math.sin(heading) * look, er * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        if (m.sleepy) {
-          // Droopy eyelids.
-          ctx.fillStyle = LID;
-          ctx.beginPath();
-          ctx.arc(ex, ey, er + 1.5, Math.PI, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(ex - er, ey);
-          ctx.lineTo(ex + er, ey);
-          ctx.stroke();
-        }
-      }
-    }
+    // The kid's own Googly Eyes, where they stuck them on the drawing.
+    const r = eyeRadius(m.width, m.height);
+    m.eyes.forEach((eye, i) => {
+      drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, {
+        pupil: pupils.get(eye.id)?.offset ?? { x: 0, y: 0 },
+        spiral: hasSpiralEyes(m) ? time * 6 * (i % 2 === 0 ? 1 : -1) : undefined,
+        sleepy: m.sleepy,
+      });
+    });
     ctx.restore();
 
     if (m.sleepy && !m.caught) {
@@ -350,25 +365,6 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       for (const p of s.path.slice(1)) ctx.lineTo(p.x, p.y);
       ctx.stroke();
     }
-    ctx.restore();
-  }
-
-  function drawSpiral(cx: number, cy: number, r: number, rotation: number) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rotation);
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    const turns = 3;
-    for (let i = 0; i <= 60; i++) {
-      const t = i / 60;
-      const a = t * turns * Math.PI * 2;
-      const rr = t * r;
-      if (i === 0) ctx.moveTo(0, 0);
-      else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-    }
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -461,7 +457,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       ctx.strokeStyle = INK;
       ctx.lineWidth = 4;
       ctx.stroke();
-      if (filled) drawSpiral(0, 0, pip * 0.32, time * 4);
+      if (filled) drawSpiral(ctx, 0, 0, pip * 0.32, time * 4);
       ctx.restore();
     }
   }

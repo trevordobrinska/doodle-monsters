@@ -1,4 +1,6 @@
 import type { Clock, Dice } from "./deps";
+import type { Temperament } from "./temperaments";
+import { NAME_WORDS } from "./nameWords";
 
 export interface Arena {
   readonly width: number;
@@ -18,6 +20,10 @@ export interface MonsterView {
   readonly height: number;
   /** The name of the color the Monster was mostly drawn in, e.g. "purple". */
   readonly mainColor: string;
+  /** Undefined until the kid picks one while bringing it to life. */
+  readonly temperament: Temperament | undefined;
+  readonly eyes: readonly GooglyEye[];
+  readonly name: string;
   /** Velocity in pixels per second. Zero while Stunned. */
   readonly vx: number;
   readonly vy: number;
@@ -58,8 +64,8 @@ export type FlickResult = "flick" | "boing" | "caught" | "miss";
  */
 export type TickResult = "wallHit" | "none";
 
-/** Where the Round is: drawing the Monster, or catching it. */
-export type Phase = "draw" | "catch";
+/** Where the Round is: drawing the Monster, bringing it to life, or catching it. */
+export type Phase = "draw" | "bringToLife" | "catch";
 
 /** What the drawing screen tells the core about a finished drawing. */
 export interface InkFacts {
@@ -72,16 +78,48 @@ export interface InkFacts {
   readonly mainColor: string;
 }
 
+/**
+ * A Googly Eye stuck on the drawing. Its position is relative to the
+ * drawing's box: 0,0 is the top-left corner and 1,1 the bottom-right, so it
+ * stays put however big the Monster is shown.
+ */
+export interface GooglyEye {
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface GameCore {
   readonly arena: Arena;
   phase(): Phase;
   /** Whether a drawing has enough ink to become a Monster. The drawing screen asks this to enable "Done". */
   enoughInk(inkAmount: number): boolean;
   /**
-   * The kid pressed "Done". Moves the Round from Draw to Catch, unless there
-   * isn't enough ink yet. Returns whether it moved on.
+   * The kid pressed "Done". Moves the Round from Draw to Bring to life,
+   * unless there isn't enough ink yet. Returns whether it moved on.
    */
   finishDrawing(ink: InkFacts): boolean;
+  /** The Googly Eyes stuck on the Monster so far. */
+  eyes(): readonly GooglyEye[];
+  /**
+   * Sticks a Googly Eye on the drawing, at a point relative to its box.
+   * Returns the new eye, or undefined if it already has the most eyes allowed.
+   */
+  placeEye(at: Point): GooglyEye | undefined;
+  /** Moves a Googly Eye to a new point relative to the drawing's box. */
+  moveEye(id: number, to: Point): void;
+  removeEye(id: number): void;
+  pickTemperament(temperament: Temperament): void;
+  /** The Monster's name, as generated or typed. Empty until its drawing is done. */
+  name(): string;
+  /** 🎲: swaps the name for a different generated one. */
+  rerollName(): void;
+  /** The kid typed a name. Very long names are cut short. */
+  setName(typed: string): void;
+  /** Whether the Monster has everything it needs for its Catch to begin. */
+  canStartCatch(): boolean;
+  /** Moves the Round from Bring to life to the Catch, if it can start. Returns whether it moved on. */
+  startCatch(): boolean;
   /** Advances the game by `dt` seconds. */
   tick(dt: number): TickResult;
   monster(): MonsterView;
@@ -133,6 +171,12 @@ const SLEEPY_SPEED = 0.5;
 const LOWEST_VOICE = 0.8;
 const HIGHEST_VOICE = 1.25;
 
+/** A Monster has 1 to 5 Googly Eyes: a design rule. */
+const MIN_EYES = 1;
+export const MAX_EYES = 5;
+/** Long enough for any silly name, short enough to fit on a Name Card. */
+const MAX_NAME_LENGTH = 24;
+
 /**
  * Ink needed before "Done" works, in square drawing-screen pixels: about a
  * hand-span of thin line, so a single dot or tap can't become a Monster.
@@ -164,6 +208,12 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let width = 0;
   let height = 0;
   let mainColor = "";
+  let eyes: GooglyEye[] = [];
+  let nextEyeId = 1;
+  let temperament: Temperament | undefined;
+  let name = "";
+  const bringingToLife = () => phase === "bringToLife";
+  const canStartCatch = () => bringingToLife() && eyes.length >= MIN_EYES && temperament !== undefined && name.trim() !== "";
   /** There's a Monster to Bonk and Flick: its Catch has begun and isn't over. */
   const inPlay = () => phase === "catch" && !caught;
   const halfW = () => width / 2;
@@ -250,6 +300,43 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       width = ink.width * fit;
       height = ink.height * fit;
       mainColor = ink.mainColor;
+      phase = "bringToLife";
+      name = generateName(dice);
+      return true;
+    },
+    eyes: () => eyes,
+    placeEye(at) {
+      if (!bringingToLife() || eyes.length >= MAX_EYES) return undefined;
+      const eye = { id: nextEyeId++, ...onDrawing(at) };
+      eyes = [...eyes, eye];
+      return eye;
+    },
+    moveEye(id, to) {
+      if (!bringingToLife()) return;
+      eyes = eyes.map((eye) => (eye.id === id ? { id, ...onDrawing(to) } : eye));
+    },
+    removeEye(id) {
+      if (!bringingToLife()) return;
+      eyes = eyes.filter((eye) => eye.id !== id);
+    },
+    pickTemperament(picked) {
+      if (bringingToLife()) temperament = picked;
+    },
+    name: () => name,
+    rerollName() {
+      if (!bringingToLife()) return;
+      const before = name;
+      // Rolling the same name again would look like 🎲 didn't work. The
+      // limit is only for word lists so short they make a single name.
+      for (let tries = 0; name === before && tries < 100; tries++) name = generateName(dice);
+    },
+    setName(typed) {
+      if (bringingToLife()) name = typed.slice(0, MAX_NAME_LENGTH);
+    },
+    canStartCatch,
+    startCatch() {
+      if (!canStartCatch()) return false;
+      name = name.trim();
       phase = "catch";
       return true;
     },
@@ -277,6 +364,9 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       width,
       height,
       mainColor,
+      temperament,
+      eyes,
+      name,
       vx: dirX * speed(),
       vy: dirY * speed(),
       dizzy,
@@ -314,6 +404,17 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       return "flick";
     },
   };
+}
+
+/** Fills a name template's {blanks} from the word lists, choosing with the dice. */
+function generateName(dice: Dice): string {
+  const pick = (words: readonly string[]) => words[Math.floor(dice.roll() * words.length)];
+  return pick(NAME_WORDS.templates).replace(/\{(\w+)\}/g, (_, list: keyof typeof NAME_WORDS) => pick(NAME_WORDS[list]));
+}
+
+/** Keeps a point relative to the drawing's box inside the box. */
+function onDrawing(p: Point): Point {
+  return { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) };
 }
 
 /** Whether any leg of the path comes within `radius` of `centre`. */

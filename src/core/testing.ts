@@ -20,10 +20,13 @@ export function newRound(seed = 1): GameCore {
   return createGameCore({ clock: fakeClock(), dice: seededDice(seed) });
 }
 
-/** A Round whose drawing is finished, so its Catch has begun. */
+/** A Round whose drawing is finished and brought to life, so its Catch has begun. */
 export function buildCore(seed = 1, drawing: InkFacts = A_DRAWING): GameCore {
   const core = newRound(seed);
   if (!core.finishDrawing(drawing)) throw new Error("The drawing wasn't accepted");
+  core.placeEye({ x: 0.5, y: 0.3 });
+  core.pickTemperament("speedy");
+  if (!core.startCatch()) throw new Error("The Catch didn't start");
   return core;
 }
 
