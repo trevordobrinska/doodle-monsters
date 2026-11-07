@@ -4,14 +4,14 @@ import { buildCore, runFor } from "./testing";
 
 function expectInsideArena(core: GameCore) {
   const { width, height } = core.arena;
-  const { x, y, radius } = core.blob();
+  const { x, y, radius } = core.monster();
   expect(x - radius).toBeGreaterThanOrEqual(0);
   expect(x + radius).toBeLessThanOrEqual(width);
   expect(y - radius).toBeGreaterThanOrEqual(0);
   expect(y + radius).toBeLessThanOrEqual(height);
 }
 
-describe("the blob in the arena", () => {
+describe("the Monster in the arena", () => {
   it("bounces off the walls and stays inside the arena", () => {
     const core = buildCore();
     const { width, height } = core.arena;
@@ -19,7 +19,7 @@ describe("the blob in the arena", () => {
 
     runFor(core, 30, () => {
       expectInsideArena(core);
-      const { x, y, radius } = core.blob();
+      const { x, y, radius } = core.monster();
       if (x - radius <= 1) seen.left = true;
       if (x + radius >= width - 1) seen.right = true;
       if (y - radius <= 1) seen.top = true;

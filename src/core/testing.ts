@@ -25,3 +25,25 @@ export function runFor(core: GameCore, seconds: number, onFrame?: () => void): v
     onFrame?.();
   }
 }
+
+/** Taps right on the middle of the Monster, wherever it is now. */
+export function tapMonster(core: GameCore) {
+  const { x, y } = core.monster();
+  return core.bonk({ x, y });
+}
+
+/** Ticks frame by frame until `done` holds. Fails the test if it never does. */
+export function runUntil(core: GameCore, done: () => boolean, maxSeconds = 600): void {
+  const dt = 1 / 60;
+  for (let elapsed = 0; elapsed < maxSeconds; elapsed += dt) {
+    if (done()) return;
+    core.tick(dt);
+  }
+  throw new Error(`Still waiting after ${maxSeconds} s`);
+}
+
+/** How fast the Monster is moving right now, in pixels per second. */
+export function speedOf(core: GameCore): number {
+  const { vx, vy } = core.monster();
+  return Math.hypot(vx, vy);
+}
