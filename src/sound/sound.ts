@@ -49,6 +49,9 @@ export function createSound(): Sound {
   }
 
   function unlock() {
+    // Wait for an event the browser counts as permission to play (a touch's
+    // finger-down doesn't count), or Chrome warns that audio wasn't allowed.
+    if (navigator.userActivation && !navigator.userActivation.isActive) return;
     if (!audio) {
       audio = new AudioContext();
       output = audio.createGain();
