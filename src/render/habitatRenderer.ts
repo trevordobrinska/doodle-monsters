@@ -5,7 +5,8 @@ import { createLetterbox } from "./letterbox";
 /**
  * Draws the Zoo's Habitat from the core's state: every Monster wandering
  * and hopping about, Googly Eyes jiggling, and watching the kid's finger
- * while they touch the screen. Holds no game rules.
+ * while they touch the screen. Napping Monsters doze where they are, with a
+ * 💤. Holds no game rules.
  */
 export interface HabitatRenderer {
   resize(): void;
@@ -27,6 +28,11 @@ const HOPS_PER_SECOND = 2.2;
 const HOP_HEIGHT = 10;
 /** ...and the speed (px/s) those are for. */
 const STROLL_SPEED = 90;
+/** A Napping Monster breathes in and out this often, swelling by this much... */
+const BREATH_SECONDS = 3;
+const BREATH_SWELL = 0.04;
+/** ...while its 💤 badge bobs up and down this often. */
+const ZZZ_SECONDS = 2.4;
 /** Seconds a Monster takes to pop into the Habitat. */
 const POP_IN_SECONDS = 0.5;
 /** Tufts of grass dotted about, so the Habitat isn't bare: scattered evenly-ish, the same every time. */
@@ -40,6 +46,8 @@ interface Seen {
   pupils: Pupil[];
   hopPhase: number;
   shownFor: number;
+  /** Seconds since it started Napping, for its breathing and 💤. */
+  dozing: number;
 }
 
 export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore): HabitatRenderer {
@@ -53,7 +61,7 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
   function seenFor(m: ZooMonsterView): Seen {
     let s = seen.get(m.id);
     if (!s) {
-      s = { pupils: m.eyes.map((_, i) => createPupil(springinessFor(i))), hopPhase: Math.random(), shownFor: 0 };
+      s = { pupils: m.eyes.map((_, i) => createPupil(springinessFor(i))), hopPhase: Math.random(), shownFor: 0, dozing: 0 };
       seen.set(m.id, s);
       const fresh = s;
       // Decoding takes a moment; the Monster pops in once it's ready.
@@ -74,6 +82,12 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
 
     // Nearer the bottom is nearer the kid, so drawn on top.
     const monsters = [...core.zoo()].sort((a, b) => a.y - b.y);
+    // Forget Monsters that left (a resumed Napping one), so one that comes
+    // back after its Catch pops in afresh.
+    if (seen.size > monsters.length) {
+      const here = new Set(monsters.map((m) => m.id));
+      for (const id of seen.keys()) if (!here.has(id)) seen.delete(id);
+    }
     for (const m of monsters) drawMonster(m, seenFor(m), dt, finger);
   }
 
@@ -102,7 +116,14 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
     const pop = t < 1 ? 1 - Math.cos(t * Math.PI * 2.5) * (1 - t) : 1;
     // Squashes as it lands each hop.
     const landing = 1 - Math.abs(Math.sin(s.hopPhase * Math.PI));
-    const squash = landing ** 6 * 0.12 * strength;
+    let squash = landing ** 6 * 0.12 * strength;
+    if (m.napping) {
+      // Slow, deep breaths: a little wider and shorter, then back.
+      s.dozing += dt;
+      squash = Math.sin((s.dozing * Math.PI * 2) / BREATH_SECONDS) * BREATH_SWELL;
+    } else {
+      s.dozing = 0;
+    }
 
     // Shadow stays on the ground while it hops.
     ctx.fillStyle = "rgba(43, 43, 64, 0.15)";
@@ -120,9 +141,32 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
       const ex = (eye.x - 0.5) * m.width;
       const ey = (eye.y - 0.5) * m.height;
       const pupil = s.pupils[i];
-      pupil.follow(dt, { x: at.x + ex, y: at.y + ey }, finger);
-      drawGooglyEye(ctx, ex, ey, r, { pupil: pupil.offset });
+      // Napping eyes droop half shut, and don't watch the finger.
+      pupil.follow(dt, { x: at.x + ex, y: at.y + ey }, m.napping ? undefined : finger);
+      drawGooglyEye(ctx, ex, ey, r, { pupil: pupil.offset, sleepy: m.napping });
     });
+    ctx.restore();
+    if (m.napping) drawZzz(m, s.dozing, pop);
+  }
+
+  /** The 💤 badge: a white bubble by the Monster's top corner, bobbing gently so it catches the eye. */
+  function drawZzz(m: ZooMonsterView, dozing: number, pop: number) {
+    const bob = Math.sin((dozing * Math.PI * 2) / ZZZ_SECONDS) * 4;
+    const r = 26 * pop;
+    const x = Math.min(core.arena.width - r, m.x + m.width * 0.4);
+    const y = Math.max(r, m.y - m.height * 0.45 + bob);
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.strokeStyle = "#2b2b40";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = `${r * 1.2}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("💤", x, y + r * 0.05);
     ctx.restore();
   }
 

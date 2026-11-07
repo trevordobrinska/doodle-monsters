@@ -143,8 +143,17 @@ function bringToLife({ image, ink }: FinishedDrawing) {
 function startCatch() {
   if (!monsterImage || !core.startCatch()) return;
   bringToLifeScreen.hide();
+  showCatch(monsterImage);
+  // The core saves the Monster Napping as its Catch begins.
+  core.saved().catch((error) => console.error("Couldn't save the Napping Monster", error));
+}
+
+/** The Catch screen, for the Monster drawn as `image`. */
+function showCatch(image: CanvasImageSource) {
+  zooRoot!.hidden = true;
   canvas!.hidden = false;
-  renderer = createRenderer(canvas!, core, monsterImage);
+  finger = undefined;
+  renderer = createRenderer(canvas!, core, image);
   renderer.resize();
   catchStartedAt = performance.now();
 }
@@ -153,6 +162,35 @@ function startCatch() {
 function goToZoo() {
   if (core.goToZoo()) showZoo();
 }
+
+/** Decoding a Napping Monster's drawing takes a moment; ignore more taps meanwhile. */
+let resuming = false;
+
+/** The kid tapped a Napping Monster in the Zoo: back to its Catch. */
+function resumeNapping(id: string, image: Blob) {
+  if (resuming) return;
+  resuming = true;
+  createImageBitmap(image)
+    .then((bitmap) => {
+      if (!core.resume(id)) return;
+      showCatch(bitmap);
+      // The app was hidden while the drawing decoded: straight back to Napping.
+      if (document.visibilityState === "hidden") leave();
+    })
+    .catch((error) => console.error("Couldn't resume the Napping Monster", error))
+    .finally(() => (resuming = false));
+}
+
+// Leaving mid-Catch (the app hidden, closed or navigated away from) sends the
+// Monster to the Zoo Napping. The core saved it the moment its Catch began,
+// so it's kept even if the tablet closes the app without another word.
+function leave() {
+  if (core.leave()) showZoo();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") leave();
+});
+window.addEventListener("pagehide", leave);
 
 // Bring back the saved Zoo, then open straight into it.
 core
@@ -177,10 +215,15 @@ function noteIfCaught(result: TapResult | FlickResult) {
 }
 
 // The gesture layer tells taps from Flicks. The core decides whether they hit the Monster.
-// The game canvas is hidden while drawing, and shows the Habitat in the Zoo,
-// so these only act during a Catch.
+// The game canvas is hidden while drawing. In the Zoo, a tap on a Monster
+// asks the core to resume it, which only a Napping one will.
 listenForGestures(canvas, (clientX, clientY) => (renderer ?? habitat).toArena(clientX, clientY), {
   onTap(at) {
+    if (core.phase() === "zoo") {
+      const tapped = core.zooMonsterAt(at);
+      if (tapped?.napping) resumeNapping(tapped.id, tapped.image);
+      return;
+    }
     if (!renderer) return;
     if (caughtAt !== undefined) {
       if (performance.now() - caughtAt > TAP_TO_ZOO_AFTER_MS) goToZoo();

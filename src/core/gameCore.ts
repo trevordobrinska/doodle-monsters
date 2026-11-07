@@ -88,9 +88,11 @@ export interface ZooMonsterView {
   /** Its size in arena units, as during its Catch. */
   readonly width: number;
   readonly height: number;
-  /** Velocity in pixels per second. */
+  /** Velocity in pixels per second. Zero while Napping. */
   readonly vx: number;
   readonly vy: number;
+  /** Its Catch was left unfinished: it sleeps (💤) until the kid taps it to resume. */
+  readonly napping: boolean;
 }
 
 /** What the drawing screen tells the core about a finished drawing. */
@@ -123,10 +125,19 @@ export interface GameCore {
    * Habitat. Call once when the app opens, before showing the Zoo.
    */
   loadZoo(): Promise<void>;
-  /** Every Monster in the Zoo, oldest drawing first. */
+  /** Every Monster in the Zoo, Napping ones included, oldest drawing first. */
   zoo(): readonly ZooMonsterView[];
   /** Settles once everything changed so far is saved. Rejects if saving failed. */
   saved(): Promise<void>;
+  /**
+   * The kid left mid-Catch (the app was hidden, closed or navigated away
+   * from): the Monster goes to the Zoo Napping. Returns whether it went.
+   */
+  leave(): boolean;
+  /** The Zoo Monster at a point in the Habitat (the one in front, if several), or undefined. */
+  zooMonsterAt(at: Point): ZooMonsterView | undefined;
+  /** The kid tapped a Napping Monster: back to its Catch. Returns whether it resumed. */
+  resume(id: string): boolean;
   /** "Draw a Monster!": starts a new Round from the Zoo. Returns whether it started. */
   startRound(): boolean;
   /** After the Catch, the caught Monster's kid goes back to the Zoo. Returns whether it went. */
@@ -254,8 +265,12 @@ const MAX_NAME_LENGTH = 24;
  */
 const MIN_INK = 6000;
 
-/** One Round's Monster. `hardMode` is asked each time, as the kid can flip it between Rounds. */
-function createRound(dice: Dice, hardMode: () => boolean): Round {
+/**
+ * One Round's Monster. `hardMode` is asked each time, as the kid can flip it
+ * between Rounds. Given a Napping Monster, the Round resumes its Catch, with
+ * Dizzy starting fresh.
+ */
+function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecord): Round {
   const arena = ARENA;
 
   // Start in the middle, heading diagonally-ish (20°–70° off the axes)
@@ -286,6 +301,14 @@ function createRound(dice: Dice, hardMode: () => boolean): Round {
   let nextEyeId = 1;
   let temperament: Temperament | undefined;
   let name = "";
+  if (napping) {
+    ({ width, height } = monsterSize(napping.drawingSize));
+    mainColor = napping.mainColor;
+    eyes = napping.eyes.map(({ x, y }) => ({ id: nextEyeId++, x, y }));
+    temperament = napping.temperament;
+    name = napping.name;
+    phase = "catch";
+  }
   /** How it behaves during its Catch: its Temperament's, tightened in hard mode. */
   function behavior(): Behavior {
     // Only asked once the Catch has begun, which needs a Temperament; the
@@ -369,16 +392,9 @@ function createRound(dice: Dice, hardMode: () => boolean): Round {
     return undefined;
   }
 
-  /**
-   * Whether a tap (one point) or a swipe lands on the Monster's oval, with
-   * TOUCH_SLOP of slack all round. Squashing the arena so the oval becomes a
-   * unit circle turns this into a circle test.
-   */
+  /** Whether a tap (one point) or a swipe lands on the Monster. */
   function crossesMonster(path: readonly Point[]): boolean {
-    const rx = halfW() + TOUCH_SLOP;
-    const ry = halfH() + TOUCH_SLOP;
-    const squashed = path.map((p) => ({ x: (p.x - x) / rx, y: (p.y - y) / ry }));
-    return crossesCircle(squashed, { x: 0, y: 0 }, 1);
+    return crossesOval(path, { x, y }, width, height);
   }
 
   function drainDizzy(dt: number) {
@@ -533,6 +549,12 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
   let inZoo = true;
   /** What the Round's Monster will be saved with, from its finished drawing. */
   let drawing: { image: Blob; size: { width: number; height: number }; drawnAt: string } | undefined;
+  /**
+   * The Monster being caught, as saved. It's saved Napping the moment its
+   * Catch begins, so it's never lost however the kid leaves, even if the
+   * tablet closes the app without warning.
+   */
+  let catching: MonsterRecord | undefined;
   let habitat: HabitatMonster[] = [];
   let saving: Promise<void> = Promise.resolve();
 
@@ -562,11 +584,11 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     saving = saving.catch(() => {}).then(() => storage.save(record));
   }
 
-  /** The Round's Monster was just caught: it moves into the Zoo, for good. */
-  function moveIntoZoo() {
+  /** The Round's Catch just began: its Monster is saved, Napping until it's caught. */
+  function saveNapping() {
     const m = round.monster();
     if (!drawing || !m.temperament) return;
-    const record: MonsterRecord = {
+    catching = {
       schemaVersion: MONSTER_SCHEMA_VERSION,
       id: newId(dice),
       name: m.name,
@@ -577,14 +599,44 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       bio: "",
       mainColor: m.mainColor,
       drawnAt: drawing.drawnAt,
-      status: "zoo",
+      status: "napping",
     };
-    habitat = [...habitat, intoHabitat(record, m)];
+    save(catching);
+  }
+
+  /** The Round's Monster was just caught: it moves into the Zoo, for good. */
+  function moveIntoZoo() {
+    if (!catching) return;
+    const record: MonsterRecord = { ...catching, status: "zoo" };
+    catching = undefined;
+    habitat = [...habitat, intoHabitat(record, round.monster())];
     save(record);
+  }
+
+  function view(h: HabitatMonster): ZooMonsterView {
+    const napping = h.record.status === "napping";
+    return {
+      id: h.record.id,
+      name: h.record.name,
+      image: h.record.image,
+      temperament: h.record.temperament,
+      mainColor: h.record.mainColor,
+      eyes: h.eyes,
+      drawnAt: h.record.drawnAt,
+      x: h.x,
+      y: h.y,
+      width: h.width,
+      height: h.height,
+      // Napping Monsters sleep where they are.
+      vx: napping ? 0 : h.dirX * h.speed,
+      vy: napping ? 0 : h.dirY * h.speed,
+      napping,
+    };
   }
 
   function wander(dt: number) {
     for (const h of habitat) {
+      if (h.record.status === "napping") continue;
       h.turnIn -= dt;
       if (h.turnIn <= 0) {
         h.turnIn += turnDelay();
@@ -604,34 +656,43 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     phase: () => (inZoo ? "zoo" : round.phase()),
     async loadZoo() {
       const records = await storage.list();
-      const here = new Set(habitat.map((h) => h.record.id));
+      // Skip Monsters already here, and the one being caught right now.
+      const here = new Set([...habitat.map((h) => h.record.id), catching?.id]);
       const arriving = records
-        .filter((r) => r.status === "zoo" && !here.has(r.id))
+        .filter((r) => !here.has(r.id))
         .map((r) => intoHabitat(r, { x: dice.roll() * arena.width, y: dice.roll() * arena.height }));
       habitat = [...habitat, ...arriving];
     },
-    zoo: () =>
-      habitat.map((h) => ({
-        id: h.record.id,
-        name: h.record.name,
-        image: h.record.image,
-        temperament: h.record.temperament,
-        mainColor: h.record.mainColor,
-        eyes: h.eyes,
-        drawnAt: h.record.drawnAt,
-        x: h.x,
-        y: h.y,
-        width: h.width,
-        height: h.height,
-        vx: h.dirX * h.speed,
-        vy: h.dirY * h.speed,
-      })),
+    zoo: () => habitat.map(view),
+    zooMonsterAt(at) {
+      // Nearer the bottom is drawn in front, so it's the one a tap lands on.
+      const hit = habitat.filter((h) => onOval(at, h, h.width, h.height)).sort((a, b) => b.y - a.y)[0];
+      return hit && view(hit);
+    },
+    resume(id) {
+      const h = habitat.find((h) => h.record.id === id);
+      if (!inZoo || h?.record.status !== "napping") return false;
+      habitat = habitat.filter((other) => other !== h);
+      round = createRound(dice, () => hardMode, h.record);
+      drawing = undefined;
+      catching = h.record;
+      inZoo = false;
+      return true;
+    },
     saved: () => saving,
     startRound() {
       if (!inZoo) return false;
       round = createRound(dice, () => hardMode);
       drawing = undefined;
+      catching = undefined;
       inZoo = false;
+      return true;
+    },
+    leave() {
+      if (inZoo || round.phase() !== "catch" || round.monster().caught || !catching) return false;
+      habitat = [...habitat, intoHabitat(catching, round.monster())];
+      catching = undefined;
+      inZoo = true;
       return true;
     },
     goToZoo() {
@@ -662,7 +723,11 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     rerollName: () => round.rerollName(),
     setName: (typed) => round.setName(typed),
     canStartCatch: () => round.canStartCatch(),
-    startCatch: () => round.startCatch(),
+    startCatch() {
+      if (!round.startCatch()) return false;
+      saveNapping();
+      return true;
+    },
     tick(dt) {
       if (inZoo) {
         wander(dt);
@@ -709,6 +774,23 @@ function generateName(dice: Dice): string {
 /** Keeps a point relative to the drawing's box inside the box. */
 function onDrawing(p: Point): Point {
   return { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) };
+}
+
+/**
+ * Whether a tap (one point) or a swipe lands on the oval filling a Monster's
+ * box, with TOUCH_SLOP of slack all round. Squashing the arena so the oval
+ * becomes a unit circle turns this into a circle test.
+ */
+function crossesOval(path: readonly Point[], centre: Point, width: number, height: number): boolean {
+  const rx = width / 2 + TOUCH_SLOP;
+  const ry = height / 2 + TOUCH_SLOP;
+  const squashed = path.map((p) => ({ x: (p.x - centre.x) / rx, y: (p.y - centre.y) / ry }));
+  return crossesCircle(squashed, { x: 0, y: 0 }, 1);
+}
+
+/** Whether a tap lands on the oval filling a Monster's box, centred on it. */
+function onOval(at: Point, centre: Point, width: number, height: number): boolean {
+  return crossesOval([at], centre, width, height);
 }
 
 /** Whether any leg of the path comes within `radius` of `centre`. */
