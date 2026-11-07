@@ -18,6 +18,8 @@ export interface MonsterView {
   /** Steps of Dizzy that make the Monster fully Dizzy. */
   readonly fullDizzy: number;
   readonly stunned: boolean;
+  /** Flung by a Flick and flying towards a wall. */
+  readonly flying: boolean;
   /** Fully Dizzy (spiral eyes): one more tap catches it. */
   readonly readyToCatch: boolean;
   /** Worn out after a long Catch, so it moves slower. */
@@ -34,6 +36,9 @@ export interface Point {
 /** What a tap did: a Bonk, a "boing" on a Stunned Monster, a catch, or nothing. */
 export type TapResult = "bonk" | "boing" | "caught" | "miss";
 
+/** What a Flick did: flung the Monster, a "boing" on a Stunned Monster, a catch, or nothing. */
+export type FlickResult = "flick" | "boing" | "caught" | "miss";
+
 export interface GameCore {
   readonly arena: Arena;
   /** Advances the game by `dt` seconds. */
@@ -41,6 +46,11 @@ export interface GameCore {
   monster(): MonsterView;
   /** A tap at a point in arena coordinates. The core decides whether it hit. */
   bonk(at: Point): TapResult;
+  /**
+   * A quick swipe along a path in arena coordinates. The core decides
+   * whether the path crossed the Monster.
+   */
+  flick(path: readonly Point[]): FlickResult;
 }
 
 export interface GameCoreDeps {
@@ -65,6 +75,10 @@ const DASH_SECONDS = 1.5;
 const DRAIN_DELAY_SECONDS = 3;
 /** ...and then loses one step this often. */
 const DRAIN_STEP_SECONDS = 1.5;
+/** How fast a Flick flings the Monster towards a wall. */
+const FLICK_SPEED = 1600; // pixels per second
+/** A Flick counts as two Bonks: a design rule, not a tuning number. */
+const FLICK_DIZZY_STEPS = 2;
 /** A Catch can't fail: after this long the Monster gets sleepy... */
 const SLEEPY_AFTER_SECONDS = 120;
 /** ...and over this long slows down to this fraction of its speed. */
@@ -85,6 +99,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let dirY = Math.sin(angle) * randomSign();
   let dizzy = 0;
   let stunnedLeft = 0; // seconds of Stunned still to go
+  let flying = false; // flung by a Flick, heading along dirX/dirY until a wall
   let dashLeft = 0; // seconds of dash boost still to go
   let drainIn = 0; // seconds until Dizzy next loses a step
   let caught = false;
@@ -93,6 +108,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
 
   function speed() {
     if (stunnedLeft > 0 || caught) return 0;
+    if (flying) return FLICK_SPEED;
     return MONSTER_SPEED * (1 + DASH_BOOST * (dashLeft / DASH_SECONDS)) * sleepiness();
   }
 
@@ -107,6 +123,34 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     dirX = Math.cos(dashAngle);
     dirY = Math.sin(dashAngle);
     dashLeft = DASH_SECONDS;
+  }
+
+  /** Moves along the Flick until it meets a wall, then it's Stunned there. */
+  function flyTowardsWall(dt: number) {
+    const step = FLICK_SPEED * dt;
+    const toWallX = distanceToWall(x, dirX, MONSTER_RADIUS, arena.width - MONSTER_RADIUS);
+    const toWallY = distanceToWall(y, dirY, MONSTER_RADIUS, arena.height - MONSTER_RADIUS);
+    const travel = Math.min(step, toWallX, toWallY);
+    x += dirX * travel;
+    y += dirY * travel;
+    if (travel < step) {
+      flying = false;
+      stunnedLeft = STUNNED_SECONDS;
+    }
+  }
+
+  /**
+   * The rules a Bonk and a Flick share once they've hit: nothing new while
+   * Stunned or flying, and a catch once fully Dizzy. Undefined means the hit
+   * goes on to add Dizzy.
+   */
+  function hitWithoutDizzy(): "boing" | "caught" | undefined {
+    if (stunnedLeft > 0 || flying) return "boing";
+    if (readyToCatch()) {
+      caught = true;
+      return "caught";
+    }
+    return undefined;
   }
 
   function drainDizzy(dt: number) {
@@ -130,6 +174,10 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
         if (stunnedLeft === 0) dashOff();
         return;
       }
+      if (flying) {
+        flyTowardsWall(dt);
+        return;
+      }
       const frameSpeed = speed();
       dashLeft = Math.max(0, dashLeft - dt);
       x += dirX * frameSpeed * dt;
@@ -146,23 +194,61 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       dizzy,
       fullDizzy: FULL_DIZZY,
       stunned: stunnedLeft > 0,
+      flying,
       readyToCatch: readyToCatch(),
       sleepy: catchSeconds >= SLEEPY_AFTER_SECONDS,
       caught,
     }),
     bonk(at) {
       if (caught || Math.hypot(at.x - x, at.y - y) > MONSTER_RADIUS + TOUCH_SLOP) return "miss";
-      if (stunnedLeft > 0) return "boing";
-      if (readyToCatch()) {
-        caught = true;
-        return "caught";
-      }
+      const early = hitWithoutDizzy();
+      if (early) return early;
       dizzy += 1;
       drainIn = DRAIN_DELAY_SECONDS;
       stunnedLeft = STUNNED_SECONDS;
       return "bonk";
     },
+    flick(path) {
+      if (caught || !crossesCircle(path, { x, y }, MONSTER_RADIUS + TOUCH_SLOP)) return "miss";
+      const dx = path[path.length - 1].x - path[0].x;
+      const dy = path[path.length - 1].y - path[0].y;
+      const length = Math.hypot(dx, dy);
+      if (length === 0) return "miss";
+      const early = hitWithoutDizzy();
+      if (early) return early;
+      dizzy = Math.min(FULL_DIZZY, dizzy + FLICK_DIZZY_STEPS);
+      drainIn = DRAIN_DELAY_SECONDS;
+      dirX = dx / length;
+      dirY = dy / length;
+      dashLeft = 0;
+      flying = true;
+      return "flick";
+    },
   };
+}
+
+/** Whether any leg of the path comes within `radius` of `centre`. */
+function crossesCircle(path: readonly Point[], centre: Point, radius: number): boolean {
+  if (path.length === 1) return Math.hypot(path[0].x - centre.x, path[0].y - centre.y) <= radius;
+  for (let i = 1; i < path.length; i++) {
+    if (distanceToSegment(centre, path[i - 1], path[i]) <= radius) return true;
+  }
+  return false;
+}
+
+function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** How far a position can travel along `dir` (along one axis) before it meets min or max. */
+function distanceToWall(pos: number, dir: number, min: number, max: number): number {
+  if (dir > 0) return (max - pos) / dir;
+  if (dir < 0) return (min - pos) / dir;
+  return Infinity;
 }
 
 /**

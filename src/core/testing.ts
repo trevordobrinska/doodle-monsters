@@ -1,4 +1,4 @@
-import { createGameCore, type GameCore } from "./gameCore";
+import { createGameCore, type GameCore, type Point } from "./gameCore";
 import { seededDice, type Clock } from "./deps";
 
 /** A clock that only moves when the test says so. */
@@ -30,6 +30,16 @@ export function runFor(core: GameCore, seconds: number, onFrame?: () => void): v
 export function tapMonster(core: GameCore) {
   const { x, y } = core.monster();
   return core.bonk({ x, y });
+}
+
+/** A quick swipe from left to right straight through the middle of the Monster. */
+export function swipeAcross(core: GameCore): Point[] {
+  const { x, y, radius } = core.monster();
+  return [
+    { x: x - radius * 2, y },
+    { x, y },
+    { x: x + radius * 2, y },
+  ];
 }
 
 /** Ticks frame by frame until `done` holds. Fails the test if it never does. */

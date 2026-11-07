@@ -1,4 +1,4 @@
-import type { GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
+import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
 
 /**
  * Draws the core's state onto a canvas. Holds no game rules: everything it
@@ -12,6 +12,8 @@ export interface Renderer {
   toArena(clientX: number, clientY: number): Point;
   /** Starts the effects for a tap the core has judged. */
   showTap(result: TapResult, at: Point): void;
+  /** Starts the effects for a Flick the core has judged. */
+  showFlick(result: FlickResult, path: readonly Point[]): void;
   /** Draws one frame. `dt` is seconds since the last frame, for effects. */
   draw(dt: number): void;
 }
@@ -23,6 +25,10 @@ const STAR_COLORS = ["#ffd23f", "#ff8c42", "#ff5d8f", "#4cc9f0"];
 
 /** Seconds a Bonk's squash takes to spring back. */
 const SQUASH_SECONDS = 0.45;
+/** Seconds the bump against the wall takes to spring back after a Flick. */
+const WALL_BUMP_SECONDS = 0.5;
+/** Seconds a Flick's swoosh trail lingers. */
+const SWOOSH_SECONDS = 0.35;
 
 interface Particle {
   x: number;
@@ -35,6 +41,11 @@ interface Particle {
   maxLife: number;
   size: number;
   color: string;
+}
+
+interface Swoosh {
+  path: readonly Point[];
+  life: number;
 }
 
 interface Popup {
@@ -62,6 +73,10 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
   let time = 0;
   let squash = 0; // seconds left of the current Bonk squash
   let caughtFor = 0; // seconds since the bubble formed
+  let wallBump = 0; // seconds left of the squash against a wall
+  let wallAngle = 0; // direction from the Monster towards the wall it hit
+  let wasFlying = false;
+  const swooshes: Swoosh[] = [];
   const particles: Particle[] = [];
   const popups: Popup[] = [];
 
@@ -123,9 +138,57 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
     }
   }
 
+  function showFlick(result: FlickResult, path: readonly Point[]) {
+    // Always show the swoosh, so a kid sees their swipe registered even on a miss.
+    swooshes.push({ path, life: SWOOSH_SECONDS });
+    const m = core.monster();
+    switch (result) {
+      case "flick":
+        // The flight can end within the very next tick, before draw() ever sees
+        // `flying`, so note it here or the wall bump would be skipped.
+        wasFlying = true;
+        burst({ x: m.x, y: m.y }, 6, 300);
+        popups.push({ text: "FLICK!", x: m.x, y: m.y - m.radius - 20, life: 0.8, maxLife: 0.8 });
+        break;
+      case "boing":
+      case "caught":
+        showTap(result, path[path.length - 1]);
+        break;
+      case "miss":
+        break;
+    }
+  }
+
+  /** Notices the moment a flung Monster lands against a wall and starts the bump. */
+  function watchForWallHit(m: MonsterView) {
+    if (wasFlying && !m.flying && !m.caught) {
+      const { width, height } = core.arena;
+      // The wall it is touching, from where it stopped.
+      const gaps = [
+        { gap: width - m.radius - m.x, angle: 0 },
+        { gap: height - m.radius - m.y, angle: Math.PI / 2 },
+        { gap: m.x - m.radius, angle: Math.PI },
+        { gap: m.y - m.radius, angle: -Math.PI / 2 },
+      ];
+      wallAngle = gaps.reduce((a, b) => (b.gap < a.gap ? b : a)).angle;
+      wallBump = WALL_BUMP_SECONDS;
+      const wallX = m.x + Math.cos(wallAngle) * m.radius;
+      const wallY = m.y + Math.sin(wallAngle) * m.radius;
+      burst({ x: wallX, y: wallY }, 10, 420);
+      popups.push({ text: "THUD!", x: m.x, y: m.y - m.radius - 20, life: 0.7, maxLife: 0.7 });
+    }
+    wasFlying = m.flying;
+  }
+
   function update(dt: number) {
     time += dt;
     squash = Math.max(0, squash - dt);
+    wallBump = Math.max(0, wallBump - dt);
+    watchForWallHit(core.monster());
+    for (let i = swooshes.length - 1; i >= 0; i--) {
+      swooshes[i].life -= dt;
+      if (swooshes[i].life <= 0) swooshes.splice(i, 1);
+    }
     if (core.monster().caught) caughtFor += dt;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -157,6 +220,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
     ctx.fillRect(0, 0, width, height);
 
     const m = core.monster();
+    for (const s of swooshes) drawSwoosh(s);
     drawMonster(m);
     if (m.stunned) drawOrbitingStars(m);
     if (m.caught) drawBubble(m);
@@ -197,8 +261,17 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       ctx.scale(1 + stretch, 1 - stretch * 0.6);
       ctx.rotate(-heading);
     }
+    if (wallBump > 0) {
+      // Flattened against the wall, with the wall-side edge staying put, then springing back.
+      const t = 1 - wallBump / WALL_BUMP_SECONDS; // 0 → 1
+      const amount = Math.cos(t * Math.PI * 2.5) * (1 - t) * 0.4;
+      ctx.rotate(wallAngle);
+      ctx.translate(m.radius * amount, 0);
+      ctx.scale(1 - amount, 1 + amount * 0.6);
+      ctx.rotate(-wallAngle);
+    }
     ctx.scale(sx, sy);
-    if (m.stunned && squash === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
+    if (m.stunned && squash === 0 && wallBump === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
 
     const r = m.radius;
     ctx.fillStyle = BODY;
@@ -252,6 +325,24 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
       ctx.fillText("z", m.x + m.radius * 0.8 + zz * 20, m.y - m.radius - zz * 40);
       ctx.globalAlpha = 1;
     }
+  }
+
+  function drawSwoosh(s: Swoosh) {
+    if (s.path.length < 2) return;
+    const t = s.life / SWOOSH_SECONDS; // 1 → 0
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = t;
+    for (const [color, width] of [[INK, 26], ["#ffffff", 16]] as const) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width * t;
+      ctx.beginPath();
+      ctx.moveTo(s.path[0].x, s.path[0].y);
+      for (const p of s.path.slice(1)) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawSpiral(cx: number, cy: number, r: number, rotation: number) {
@@ -366,5 +457,5 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore): Rende
     }
   }
 
-  return { resize, toArena, showTap, draw };
+  return { resize, toArena, showTap, showFlick, draw };
 }

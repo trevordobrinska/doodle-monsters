@@ -1,6 +1,7 @@
-import { createGameCore, type GameCore } from "./core/gameCore";
+import { createGameCore, type FlickResult, type GameCore, type TapResult } from "./core/gameCore";
 import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
+import { listenForGestures } from "./input/gestures";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
 // was hidden) the game just resumes instead of leaping ahead.
@@ -34,21 +35,30 @@ startCatch();
 
 window.addEventListener("resize", () => renderer.resize());
 
-// Every finger-down is a tap. The core decides whether it hit the Monster.
-canvas.addEventListener("pointerdown", (event) => {
-  event.preventDefault();
-  if (caughtAt !== undefined) {
-    if (performance.now() - caughtAt > NEW_CATCH_AFTER_MS) startCatch();
-    return;
-  }
-  const at = renderer.toArena(event.clientX, event.clientY);
-  const result = core.bonk(at);
-  renderer.showTap(result, at);
-  if (result === "caught") {
-    caughtAt = performance.now();
-    // Handy while tuning: a normal Catch should take about 30–60 s.
-    console.info(`Caught in ${((caughtAt - catchStartedAt) / 1000).toFixed(1)} s`);
-  }
+function noteIfCaught(result: TapResult | FlickResult) {
+  if (result !== "caught") return;
+  caughtAt = performance.now();
+  // Handy while tuning: a normal Catch should take about 30–60 s.
+  console.info(`Caught in ${((caughtAt - catchStartedAt) / 1000).toFixed(1)} s`);
+}
+
+// The gesture layer tells taps from Flicks. The core decides whether they hit the Monster.
+listenForGestures(canvas, (clientX, clientY) => renderer.toArena(clientX, clientY), {
+  onTap(at) {
+    if (caughtAt !== undefined) {
+      if (performance.now() - caughtAt > NEW_CATCH_AFTER_MS) startCatch();
+      return;
+    }
+    const result = core.bonk(at);
+    renderer.showTap(result, at);
+    noteIfCaught(result);
+  },
+  onFlick(path) {
+    if (caughtAt !== undefined) return;
+    const result = core.flick(path);
+    renderer.showFlick(result, path);
+    noteIfCaught(result);
+  },
 });
 
 let last: number | undefined;
