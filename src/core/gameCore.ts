@@ -1,6 +1,7 @@
 import type { Clock, Dice } from "./deps";
 import { BEHAVIORS, tighten, type Behavior, type Temperament } from "./temperaments";
 import { NAME_WORDS } from "./nameWords";
+import { MONSTER_SCHEMA_VERSION, type MonsterRecord, type ZooStorage } from "./zooStorage";
 
 export interface Arena {
   readonly width: number;
@@ -64,8 +65,33 @@ export type FlickResult = "flick" | "boing" | "caught" | "miss";
  */
 export type TickResult = "wallHit" | "none";
 
-/** Where the Round is: drawing the Monster, bringing it to life, or catching it. */
-export type Phase = "draw" | "bringToLife" | "catch";
+/**
+ * Where the app is: in the Zoo between Rounds, or in a Round drawing the
+ * Monster, bringing it to life, or catching it.
+ */
+export type Phase = "zoo" | "draw" | "bringToLife" | "catch";
+
+/** A Monster living in the Zoo, wandering its Habitat. */
+export interface ZooMonsterView {
+  readonly id: string;
+  readonly name: string;
+  /** The kid's drawing, trimmed to its ink. */
+  readonly image: Blob;
+  readonly temperament: Temperament;
+  readonly mainColor: string;
+  readonly eyes: readonly GooglyEye[];
+  /** When its drawing was finished, as an ISO 8601 date and time. */
+  readonly drawnAt: string;
+  /** Where it is in the Habitat, which is the same size as the arena. */
+  readonly x: number;
+  readonly y: number;
+  /** Its size in arena units, as during its Catch. */
+  readonly width: number;
+  readonly height: number;
+  /** Velocity in pixels per second. */
+  readonly vx: number;
+  readonly vy: number;
+}
 
 /** What the drawing screen tells the core about a finished drawing. */
 export interface InkFacts {
@@ -92,13 +118,26 @@ export interface GooglyEye {
 export interface GameCore {
   readonly arena: Arena;
   phase(): Phase;
+  /**
+   * Brings back the Zoo saved on the device, putting its Monsters in their
+   * Habitat. Call once when the app opens, before showing the Zoo.
+   */
+  loadZoo(): Promise<void>;
+  /** Every Monster in the Zoo, oldest drawing first. */
+  zoo(): readonly ZooMonsterView[];
+  /** Settles once everything changed so far is saved. Rejects if saving failed. */
+  saved(): Promise<void>;
+  /** "Draw a Monster!": starts a new Round from the Zoo. Returns whether it started. */
+  startRound(): boolean;
+  /** After the Catch, the caught Monster's kid goes back to the Zoo. Returns whether it went. */
+  goToZoo(): boolean;
   /** Whether a drawing has enough ink to become a Monster. The drawing screen asks this to enable "Done". */
   enoughInk(inkAmount: number): boolean;
   /**
    * The kid pressed "Done". Moves the Round from Draw to Bring to life,
    * unless there isn't enough ink yet. Returns whether it moved on.
    */
-  finishDrawing(ink: InkFacts): boolean;
+  finishDrawing(ink: InkFacts, image: Blob): boolean;
   /** The Googly Eyes stuck on the Monster so far. */
   eyes(): readonly GooglyEye[];
   /**
@@ -123,7 +162,7 @@ export interface GameCore {
   canStartCatch(): boolean;
   /** Moves the Round from Bring to life to the Catch, if it can start. Returns whether it moved on. */
   startCatch(): boolean;
-  /** Advances the game by `dt` seconds. */
+  /** Advances the game by `dt` seconds: the Catch, or the Monsters wandering the Zoo. */
   tick(dt: number): TickResult;
   monster(): MonsterView;
   /** A tap at a point in arena coordinates. The core decides whether it hit. */
@@ -138,6 +177,30 @@ export interface GameCore {
 export interface GameCoreDeps {
   clock: Clock;
   dice: Dice;
+  storage: ZooStorage;
+}
+
+/** What one Round looks after: a single Monster, from its drawing to its Catch. */
+interface Round
+  extends Pick<
+    GameCore,
+    | "eyes"
+    | "placeEye"
+    | "moveEye"
+    | "removeEye"
+    | "pickTemperament"
+    | "name"
+    | "rerollName"
+    | "setName"
+    | "canStartCatch"
+    | "startCatch"
+    | "tick"
+    | "monster"
+    | "bonk"
+    | "flick"
+  > {
+  phase(): Exclude<Phase, "zoo">;
+  finishDrawing(ink: InkFacts): boolean;
 }
 
 /** Landscape Fire HD 8 resolution: the size every rule is designed against. */
@@ -191,7 +254,8 @@ const MAX_NAME_LENGTH = 24;
  */
 const MIN_INK = 6000;
 
-export function createGameCore({ dice }: GameCoreDeps): GameCore {
+/** One Round's Monster. `hardMode` is asked each time, as the kid can flip it between Rounds. */
+function createRound(dice: Dice, hardMode: () => boolean): Round {
   const arena = ARENA;
 
   // Start in the middle, heading diagonally-ish (20°–70° off the axes)
@@ -214,7 +278,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let catchSeconds = 0; // how long this Catch has been going
   const readyToCatch = () => dizzy >= FULL_DIZZY;
   const sleepy = () => catchSeconds >= SLEEPY_AFTER_SECONDS;
-  let phase: Phase = "draw";
+  let phase: Exclude<Phase, "zoo"> = "draw";
   let width = 0;
   let height = 0;
   let mainColor = "";
@@ -222,13 +286,12 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   let nextEyeId = 1;
   let temperament: Temperament | undefined;
   let name = "";
-  let hardMode = false;
   /** How it behaves during its Catch: its Temperament's, tightened in hard mode. */
   function behavior(): Behavior {
     // Only asked once the Catch has begun, which needs a Temperament; the
     // fallback just keeps the types happy.
     const own = BEHAVIORS[temperament ?? "speedy"];
-    return hardMode ? tighten(own) : own;
+    return hardMode() ? tighten(own) : own;
   }
   const bringingToLife = () => phase === "bringToLife";
   const canStartCatch = () => bringingToLife() && eyes.length >= MIN_EYES && temperament !== undefined && name.trim() !== "";
@@ -330,14 +393,10 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   }
 
   return {
-    arena,
     phase: () => phase,
-    enoughInk: (inkAmount) => inkAmount >= MIN_INK,
     finishDrawing(ink) {
       if (phase !== "draw" || ink.inkAmount < MIN_INK || !(ink.width > 0 && ink.height > 0)) return false;
-      const fit = MONSTER_SIZE / Math.max(ink.width, ink.height);
-      width = ink.width * fit;
-      height = ink.height * fit;
+      ({ width, height } = monsterSize(ink));
       mainColor = ink.mainColor;
       phase = "bringToLife";
       name = generateName(dice);
@@ -361,10 +420,6 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     pickTemperament(picked) {
       if (bringingToLife()) temperament = picked;
     },
-    setHardMode(on) {
-      hardMode = on;
-    },
-    hardMode: () => hardMode,
     name: () => name,
     rerollName() {
       if (!bringingToLife()) return;
@@ -448,6 +503,201 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       return "flick";
     },
   };
+}
+
+/** Zoo Monsters stroll: this fraction of their Catch speed. */
+const HABITAT_PACE = 0.3;
+/** A wandering Zoo Monster heads off somewhere new every this many seconds or so... */
+const HABITAT_TURN_SECONDS = { min: 2, max: 5 };
+/** ...turning by up to this many degrees either way. */
+const HABITAT_MAX_TURN = 70;
+
+/** A Monster in the Zoo: its saved record plus where it is in the Habitat. */
+interface HabitatMonster {
+  record: MonsterRecord;
+  eyes: readonly GooglyEye[];
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  speed: number;
+  turnIn: number;
+}
+
+export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore {
+  const arena = ARENA;
+  let hardMode = false;
+  let round = createRound(dice, () => hardMode);
+  let inZoo = true;
+  /** What the Round's Monster will be saved with, from its finished drawing. */
+  let drawing: { image: Blob; size: { width: number; height: number }; drawnAt: string } | undefined;
+  let habitat: HabitatMonster[] = [];
+  let saving: Promise<void> = Promise.resolve();
+
+  const randomSign = () => (dice.roll() < 0.5 ? -1 : 1);
+  const turnDelay = () => HABITAT_TURN_SECONDS.min + dice.roll() * (HABITAT_TURN_SECONDS.max - HABITAT_TURN_SECONDS.min);
+
+  /** Puts a Monster in the Habitat at a point, heading off in a random direction. */
+  function intoHabitat(record: MonsterRecord, at: Point): HabitatMonster {
+    const { width, height } = monsterSize(record.drawingSize);
+    const heading = dice.roll() * Math.PI * 2;
+    return {
+      record,
+      eyes: record.eyes.map((eye, i) => ({ id: i + 1, x: eye.x, y: eye.y })),
+      width,
+      height,
+      x: Math.min(arena.width - width / 2, Math.max(width / 2, at.x)),
+      y: Math.min(arena.height - height / 2, Math.max(height / 2, at.y)),
+      dirX: Math.cos(heading),
+      dirY: Math.sin(heading),
+      speed: BEHAVIORS[record.temperament].speed * HABITAT_PACE,
+      turnIn: turnDelay(),
+    };
+  }
+
+  function save(record: MonsterRecord) {
+    // One save after another, and one failing doesn't stop the next.
+    saving = saving.catch(() => {}).then(() => storage.save(record));
+  }
+
+  /** The Round's Monster was just caught: it moves into the Zoo, for good. */
+  function moveIntoZoo() {
+    const m = round.monster();
+    if (!drawing || !m.temperament) return;
+    const record: MonsterRecord = {
+      schemaVersion: MONSTER_SCHEMA_VERSION,
+      id: newId(dice),
+      name: m.name,
+      image: drawing.image,
+      drawingSize: drawing.size,
+      eyes: m.eyes.map(({ x, y }) => ({ x, y })),
+      temperament: m.temperament,
+      bio: "",
+      mainColor: m.mainColor,
+      drawnAt: drawing.drawnAt,
+      status: "zoo",
+    };
+    habitat = [...habitat, intoHabitat(record, m)];
+    save(record);
+  }
+
+  function wander(dt: number) {
+    for (const h of habitat) {
+      h.turnIn -= dt;
+      if (h.turnIn <= 0) {
+        h.turnIn += turnDelay();
+        const heading = Math.atan2(h.dirY, h.dirX) + ((dice.roll() * HABITAT_MAX_TURN * Math.PI) / 180) * randomSign();
+        h.dirX = Math.cos(heading);
+        h.dirY = Math.sin(heading);
+      }
+      h.x += h.dirX * h.speed * dt;
+      h.y += h.dirY * h.speed * dt;
+      ({ pos: h.x, dir: h.dirX } = bounce(h.x, h.dirX, h.width / 2, arena.width - h.width / 2));
+      ({ pos: h.y, dir: h.dirY } = bounce(h.y, h.dirY, h.height / 2, arena.height - h.height / 2));
+    }
+  }
+
+  return {
+    arena,
+    phase: () => (inZoo ? "zoo" : round.phase()),
+    async loadZoo() {
+      const records = await storage.list();
+      const here = new Set(habitat.map((h) => h.record.id));
+      const arriving = records
+        .filter((r) => r.status === "zoo" && !here.has(r.id))
+        .map((r) => intoHabitat(r, { x: dice.roll() * arena.width, y: dice.roll() * arena.height }));
+      habitat = [...habitat, ...arriving];
+    },
+    zoo: () =>
+      habitat.map((h) => ({
+        id: h.record.id,
+        name: h.record.name,
+        image: h.record.image,
+        temperament: h.record.temperament,
+        mainColor: h.record.mainColor,
+        eyes: h.eyes,
+        drawnAt: h.record.drawnAt,
+        x: h.x,
+        y: h.y,
+        width: h.width,
+        height: h.height,
+        vx: h.dirX * h.speed,
+        vy: h.dirY * h.speed,
+      })),
+    saved: () => saving,
+    startRound() {
+      if (!inZoo) return false;
+      round = createRound(dice, () => hardMode);
+      drawing = undefined;
+      inZoo = false;
+      return true;
+    },
+    goToZoo() {
+      if (inZoo || !round.monster().caught) return false;
+      inZoo = true;
+      return true;
+    },
+    enoughInk: (inkAmount) => inkAmount >= MIN_INK,
+    finishDrawing(ink, image) {
+      if (inZoo || !round.finishDrawing(ink)) return false;
+      drawing = {
+        image,
+        size: { width: ink.width, height: ink.height },
+        drawnAt: new Date(clock.now()).toISOString(),
+      };
+      return true;
+    },
+    eyes: () => round.eyes(),
+    placeEye: (at) => round.placeEye(at),
+    moveEye: (id, to) => round.moveEye(id, to),
+    removeEye: (id) => round.removeEye(id),
+    pickTemperament: (picked) => round.pickTemperament(picked),
+    setHardMode(on) {
+      hardMode = on;
+    },
+    hardMode: () => hardMode,
+    name: () => round.name(),
+    rerollName: () => round.rerollName(),
+    setName: (typed) => round.setName(typed),
+    canStartCatch: () => round.canStartCatch(),
+    startCatch: () => round.startCatch(),
+    tick(dt) {
+      if (inZoo) {
+        wander(dt);
+        return "none";
+      }
+      return round.tick(dt);
+    },
+    monster: () => round.monster(),
+    // Nothing in the Zoo can be caught (again): taps there are only for looking.
+    bonk(at) {
+      if (inZoo) return "miss";
+      const result = round.bonk(at);
+      if (result === "caught") moveIntoZoo();
+      return result;
+    },
+    flick(path) {
+      if (inZoo) return "miss";
+      const result = round.flick(path);
+      if (result === "caught") moveIntoZoo();
+      return result;
+    },
+  };
+}
+
+/** Every Monster's size in arena units: its drawing's shape, scaled so its longest side is MONSTER_SIZE. */
+function monsterSize(drawn: { width: number; height: number }) {
+  const fit = MONSTER_SIZE / Math.max(drawn.width, drawn.height);
+  return { width: drawn.width * fit, height: drawn.height * fit };
+}
+
+/** A unique id for a Monster: 128 bits from the dice, as 32 hex digits. */
+function newId(dice: Dice): string {
+  let id = "";
+  for (let i = 0; i < 4; i++) id += Math.floor(dice.roll() * 2 ** 32).toString(16).padStart(8, "0");
+  return id;
 }
 
 /** Fills a name template's {blanks} from the word lists, choosing with the dice. */

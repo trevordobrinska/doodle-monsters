@@ -1,9 +1,13 @@
 import { createGameCore, type GameCore, type InkFacts, type Point, type TickResult } from "./gameCore";
 import { seededDice, type Clock } from "./deps";
 import type { Temperament } from "./temperaments";
+import { inMemoryZooStorage, type ZooStorage } from "./zooStorage";
+
+/** 7 November 2026, noon UTC: when the fake clock starts unless told otherwise. */
+export const A_DAY = Date.UTC(2026, 10, 7, 12);
 
 /** A clock that only moves when the test says so. */
-export function fakeClock(start = 0): Clock & { advance(ms: number): void } {
+export function fakeClock(start = A_DAY): Clock & { advance(ms: number): void } {
   let t = start;
   return {
     now: () => t,
@@ -16,12 +20,32 @@ export function fakeClock(start = 0): Clock & { advance(ms: number): void } {
 /** A roundish drawing with plenty of ink. */
 export const A_DRAWING: InkFacts = { width: 400, height: 400, inkAmount: 50_000, mainColor: "purple" };
 
-/** Builds a game core with a fake clock and seeded dice, so every run is the same. */
-export function newRound(seed = 1): GameCore {
-  return createGameCore({ clock: fakeClock(), dice: seededDice(seed) });
+/** Stands in for the kid's drawing as an image. The core only stores it. */
+export const AN_IMAGE = new Blob(["a doodle"], { type: "image/png" });
+
+export interface GameOptions {
+  seed?: number;
+  /** Pass the same storage to a second core to "reload the app". */
+  storage?: ZooStorage;
+  clock?: Clock;
 }
 
-export interface CatchOptions {
+/**
+ * Builds a game core with a fake clock, seeded dice and in-memory Zoo
+ * storage, so every run is the same. It opens in the Zoo, as the app does.
+ */
+export function newGame({ seed = 1, storage = inMemoryZooStorage(), clock = fakeClock() }: GameOptions = {}): GameCore {
+  return createGameCore({ clock, dice: seededDice(seed), storage });
+}
+
+/** Builds a game core on the drawing screen: "Draw a Monster!" was just pressed. */
+export function newRound(seed = 1, options: Omit<GameOptions, "seed"> = {}): GameCore {
+  const core = newGame({ seed, ...options });
+  if (!core.startRound()) throw new Error("The Round didn't start");
+  return core;
+}
+
+export interface CatchOptions extends Omit<GameOptions, "seed"> {
   temperament?: Temperament;
   hardMode?: boolean;
 }
@@ -30,11 +54,11 @@ export interface CatchOptions {
 export function buildCore(
   seed = 1,
   drawing: InkFacts = A_DRAWING,
-  { temperament = "speedy", hardMode = false }: CatchOptions = {},
+  { temperament = "speedy", hardMode = false, ...game }: CatchOptions = {},
 ): GameCore {
-  const core = newRound(seed);
+  const core = newRound(seed, game);
   core.setHardMode(hardMode);
-  if (!core.finishDrawing(drawing)) throw new Error("The drawing wasn't accepted");
+  if (!core.finishDrawing(drawing, AN_IMAGE)) throw new Error("The drawing wasn't accepted");
   core.placeEye({ x: 0.5, y: 0.3 });
   core.pickTemperament(temperament);
   if (!core.startCatch()) throw new Error("The Catch didn't start");
@@ -100,4 +124,13 @@ export function groundCovered(core: GameCore, seconds: number): number {
     ({ x, y } = now);
   });
   return total;
+}
+
+/** Bonks the Monster until it's caught in its bubble, waiting out each Stunned. */
+export function catchIt(core: GameCore): void {
+  for (let taps = 0; !core.monster().caught; taps++) {
+    if (taps > 50) throw new Error("Never caught");
+    runUntil(core, () => !core.monster().stunned && !core.monster().flying);
+    tapMonster(core);
+  }
 }

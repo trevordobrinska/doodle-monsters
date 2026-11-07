@@ -1,5 +1,6 @@
 import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
-import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, type Pupil } from "./googlyEyes";
+import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, springinessFor, type Pupil } from "./googlyEyes";
+import { createLetterbox } from "./letterbox";
 
 /**
  * Draws the core's state onto a canvas. Holds no game rules: everything it
@@ -69,8 +70,6 @@ const halfH = (m: MonsterView) => m.height / 2;
 /** 0 when standing still, up to 1 at normal running speed: how hard it hops. */
 const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP_SPEED);
 
-/** Each eye of a face gets a slightly different springiness (0.8–1.2), so they don't jiggle in step. */
-const springinessFor = (eyeIndex: number) => 0.8 + ((eyeIndex * 0.37) % 0.4);
 
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
@@ -84,10 +83,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
   if (!maybeCtx) throw new Error("2D canvas is not supported");
   const ctx: CanvasRenderingContext2D = maybeCtx;
 
-  // Arena units → canvas pixels. The arena is letterboxed to fit the screen.
-  let scale = 1;
-  let offsetX = 0;
-  let offsetY = 0;
+  const { resize, toArena, begin } = createLetterbox(canvas, core.arena);
 
   // Effect state: purely visual, never fed back into the core.
   let time = 0;
@@ -101,23 +97,6 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
   const swooshes: Swoosh[] = [];
   const particles: Particle[] = [];
   const popups: Popup[] = [];
-
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(canvas.clientWidth * dpr);
-    canvas.height = Math.round(canvas.clientHeight * dpr);
-    const { width, height } = core.arena;
-    scale = Math.min(canvas.width / width, canvas.height / height);
-    offsetX = (canvas.width - width * scale) / 2;
-    offsetY = (canvas.height - height * scale) / 2;
-  }
-
-  function toArena(clientX: number, clientY: number): Point {
-    const rect = canvas.getBoundingClientRect();
-    const px = ((clientX - rect.left) / rect.width) * canvas.width;
-    const py = ((clientY - rect.top) / rect.height) * canvas.height;
-    return { x: (px - offsetX) / scale, y: (py - offsetY) / scale };
-  }
 
   function burst(at: Point, count: number, speed: number) {
     for (let i = 0; i < count; i++) {
@@ -237,9 +216,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
   function draw(dt: number) {
     update(dt);
     const { width, height } = core.arena;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    begin(ctx);
 
     ctx.fillStyle = FLOOR;
     ctx.fillRect(0, 0, width, height);

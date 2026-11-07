@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { A_DRAWING, newRound } from "./testing";
+import { A_DRAWING, AN_IMAGE, newRound } from "./testing";
 
 /** A Round whose drawing is done, so it's waiting to be brought to life. */
 function drawnRound(seed = 1) {
   const core = newRound(seed);
-  core.finishDrawing(A_DRAWING);
+  core.finishDrawing(A_DRAWING, AN_IMAGE);
   return core;
 }
 

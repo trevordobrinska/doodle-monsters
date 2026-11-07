@@ -25,6 +25,13 @@ const RESTITUTION = 0.55;
 /** A change in the eye's velocity (px/s) times this is the kick the pupil gets (eye radii/s). */
 const KICK = 0.012;
 const MAX_PUPIL_SPEED = 14;
+/** Pull towards a finger being watched, in eye radii per second² per eye radius away. */
+const LOOK_PULL = 90;
+/** How close the finger has to be (in the same units as the eye's position) before the pupil looks less far round. */
+const LOOK_NEAR = 60;
+
+/** Each eye of a face gets a slightly different springiness (0.8–1.2), so they don't jiggle in step. */
+export const springinessFor = (eyeIndex: number) => 0.8 + ((eyeIndex * 0.37) % 0.4);
 
 export function eyeRadius(monsterWidth: number, monsterHeight: number): number {
   return EYE_SIZE * Math.max(monsterWidth, monsterHeight);
@@ -40,8 +47,11 @@ export interface Pupil {
    * Advances the pupil, given where its eye is now (in arena units, or
    * screen pixels scaled to match). Whenever the eye speeds up, slows down or
    * turns, the loose pupil is left behind and rattles around.
+   *
+   * Given `lookAt` (a finger, in the same units), the pupil rolls round to
+   * look at it instead of settling at the bottom, still jiggling as it goes.
    */
-  follow(dt: number, eyeAt: Point): void;
+  follow(dt: number, eyeAt: Point, lookAt?: Point): void;
   readonly offset: Point;
 }
 
@@ -53,7 +63,7 @@ export function createPupil(springiness = 1): Pupil {
   let lastVelocity: Point = { x: 0, y: 0 };
   return {
     offset,
-    follow(dt, eyeAt) {
+    follow(dt, eyeAt, lookAt) {
       if (dt <= 0) return;
       const velocity = lastAt ? { x: (eyeAt.x - lastAt.x) / dt, y: (eyeAt.y - lastAt.y) / dt } : lastVelocity;
       const kick = { x: velocity.x - lastVelocity.x, y: velocity.y - lastVelocity.y };
@@ -62,7 +72,17 @@ export function createPupil(springiness = 1): Pupil {
       // The eye moved, so the loose pupil gets left behind.
       vx -= kick.x * KICK * springiness;
       vy -= kick.y * KICK * springiness;
-      vy += GRAVITY * dt;
+      if (lookAt) {
+        const dx = lookAt.x - eyeAt.x;
+        const dy = lookAt.y - eyeAt.y;
+        const away = Math.hypot(dx, dy);
+        // Right under the eye, the pupil looks straight out (the middle); further off, round to the edge.
+        const reach = away === 0 ? 0 : (ROLL_ROOM * Math.min(1, away / LOOK_NEAR)) / away;
+        vx += (dx * reach - offset.x) * LOOK_PULL * dt;
+        vy += (dy * reach - offset.y) * LOOK_PULL * dt;
+      } else {
+        vy += GRAVITY * dt;
+      }
       const keep = DAMPING ** dt;
       vx *= keep;
       vy *= keep;

@@ -1,6 +1,6 @@
 /** Where the core gets the time from. Injected so tests can control it. */
 export interface Clock {
-  /** Milliseconds since some fixed start point. */
+  /** Milliseconds since 1 January 1970 UTC, like `Date.now()`. Used for the date a Monster was drawn. */
   now(): number;
 }
 

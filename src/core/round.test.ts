@@ -1,17 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { A_DRAWING, buildCore, newRound, runFor } from "./testing";
+import { A_DRAWING, AN_IMAGE, buildCore, catchIt, newGame, newRound, runFor } from "./testing";
 
 describe("the Round", () => {
-  it("goes Draw, then Bring to life, then Catch", () => {
-    const core = newRound();
+  it("goes from the Zoo to Draw, then Bring to life, then Catch, then back to the Zoo", () => {
+    const core = newGame();
+    expect(core.phase()).toBe("zoo");
+
+    expect(core.startRound()).toBe(true);
     expect(core.phase()).toBe("draw");
 
-    expect(core.finishDrawing(A_DRAWING)).toBe(true);
+    expect(core.finishDrawing(A_DRAWING, AN_IMAGE)).toBe(true);
     expect(core.phase()).toBe("bringToLife");
 
     core.placeEye({ x: 0.5, y: 0.3 });
     core.pickTemperament("speedy");
     expect(core.startCatch()).toBe(true);
+    expect(core.phase()).toBe("catch");
+
+    catchIt(core);
+    expect(core.goToZoo()).toBe(true);
+    expect(core.phase()).toBe("zoo");
+  });
+
+  it("only goes back to the Zoo once the Monster is caught", () => {
+    const core = buildCore();
+
+    expect(core.goToZoo()).toBe(false);
+    expect(core.phase()).toBe("catch");
+  });
+
+  it("starts a Round only from the Zoo", () => {
+    const core = buildCore();
+
+    expect(core.startRound()).toBe(false);
     expect(core.phase()).toBe("catch");
   });
 
@@ -20,7 +41,7 @@ describe("the Round", () => {
     const aDot = { width: 30, height: 30, inkAmount: 700, mainColor: "red" };
 
     expect(core.enoughInk(aDot.inkAmount)).toBe(false);
-    expect(core.finishDrawing(aDot)).toBe(false);
+    expect(core.finishDrawing(aDot, AN_IMAGE)).toBe(false);
 
     expect(core.phase()).toBe("draw");
   });
@@ -104,7 +125,7 @@ describe("the Round", () => {
   it("can only finish the drawing once", () => {
     const core = buildCore(1, { ...A_DRAWING, mainColor: "orange" });
 
-    expect(core.finishDrawing({ ...A_DRAWING, mainColor: "red" })).toBe(false);
+    expect(core.finishDrawing({ ...A_DRAWING, mainColor: "red" }, AN_IMAGE)).toBe(false);
 
     expect(core.monster().mainColor).toBe("orange");
   });
@@ -112,7 +133,7 @@ describe("the Round", () => {
   it("stays in Draw if the drawing has no size, however much ink was counted", () => {
     const core = newRound();
 
-    expect(core.finishDrawing({ ...A_DRAWING, width: 0, height: 0 })).toBe(false);
+    expect(core.finishDrawing({ ...A_DRAWING, width: 0, height: 0 }, AN_IMAGE)).toBe(false);
 
     expect(core.phase()).toBe("draw");
   });
