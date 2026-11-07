@@ -1,7 +1,14 @@
-import { createGameCore, type FlickResult, type GameCore, type TapResult } from "./core/gameCore";
+import {
+  createGameCore,
+  type FlickResult,
+  type GameCore,
+  type TapResult,
+  type TickResult,
+} from "./core/gameCore";
 import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
 import { listenForGestures } from "./input/gestures";
+import { createSound, type Effect } from "./sound/sound";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
 // was hidden) the game just resumes instead of leaping ahead.
@@ -18,6 +25,22 @@ const randomDice: Dice = { roll: () => Math.random() };
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");
+
+const sound = createSound();
+
+/** The sound each result the core reports makes, if any. A Flick sounds when it hits the wall. */
+const EFFECT_FOR: Partial<Record<TapResult | FlickResult | TickResult, Effect>> = {
+  bonk: "bonk",
+  boing: "boing",
+  caught: "caught",
+  wallHit: "wallHit",
+};
+
+/** Plays a result's sound in this Monster's voice. */
+function playFor(result: TapResult | FlickResult | TickResult) {
+  const effect = EFFECT_FOR[result];
+  if (effect) sound.play(effect, core.monster().voice);
+}
 
 let core: GameCore;
 let renderer: Renderer;
@@ -51,12 +74,14 @@ listenForGestures(canvas, (clientX, clientY) => renderer.toArena(clientX, client
     }
     const result = core.bonk(at);
     renderer.showTap(result, at);
+    playFor(result);
     noteIfCaught(result);
   },
   onFlick(path) {
     if (caughtAt !== undefined) return;
     const result = core.flick(path);
     renderer.showFlick(result, path);
+    playFor(result);
     noteIfCaught(result);
   },
 });
@@ -65,7 +90,7 @@ let last: number | undefined;
 function frame(now: number) {
   const dt = last === undefined ? 0 : Math.min((now - last) / 1000, MAX_DT);
   last = now;
-  core.tick(dt);
+  playFor(core.tick(dt));
   renderer.draw(dt);
   requestAnimationFrame(frame);
 }

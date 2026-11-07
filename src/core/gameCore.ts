@@ -26,6 +26,11 @@ export interface MonsterView {
   readonly sleepy: boolean;
   /** Caught in its bubble. The Catch is over. */
   readonly caught: boolean;
+  /**
+   * How this Monster's sounds are pitched, as a playback-rate multiplier
+   * (1 = as recorded). Chosen once, so the Monster keeps its own voice.
+   */
+  readonly voice: number;
 }
 
 export interface Point {
@@ -39,10 +44,16 @@ export type TapResult = "bonk" | "boing" | "caught" | "miss";
 /** What a Flick did: flung the Monster, a "boing" on a Stunned Monster, a catch, or nothing. */
 export type FlickResult = "flick" | "boing" | "caught" | "miss";
 
+/**
+ * What happened during a tick: a flung Monster hit the wall, or nothing worth
+ * reporting. Ordinary bounces off the walls aren't reported.
+ */
+export type TickResult = "wallHit" | "none";
+
 export interface GameCore {
   readonly arena: Arena;
   /** Advances the game by `dt` seconds. */
-  tick(dt: number): void;
+  tick(dt: number): TickResult;
   monster(): MonsterView;
   /** A tap at a point in arena coordinates. The core decides whether it hit. */
   bonk(at: Point): TapResult;
@@ -84,6 +95,9 @@ const SLEEPY_AFTER_SECONDS = 120;
 /** ...and over this long slows down to this fraction of its speed. */
 const SLEEPY_SLOWDOWN_SECONDS = 10;
 const SLEEPY_SPEED = 0.5;
+/** Voices range from a bit lower to a bit higher than the recorded sounds. */
+const LOWEST_VOICE = 0.8;
+const HIGHEST_VOICE = 1.25;
 
 export function createGameCore({ dice }: GameCoreDeps): GameCore {
   const arena = ARENA;
@@ -97,6 +111,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   // Unit vector the Monster is heading along.
   let dirX = Math.cos(angle) * randomSign();
   let dirY = Math.sin(angle) * randomSign();
+  const voice = LOWEST_VOICE + dice.roll() * (HIGHEST_VOICE - LOWEST_VOICE);
   let dizzy = 0;
   let stunnedLeft = 0; // seconds of Stunned still to go
   let flying = false; // flung by a Flick, heading along dirX/dirY until a wall
@@ -126,7 +141,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   }
 
   /** Moves along the Flick until it meets a wall, then it's Stunned there. */
-  function flyTowardsWall(dt: number) {
+  function flyTowardsWall(dt: number): TickResult {
     const step = FLICK_SPEED * dt;
     const toWallX = distanceToWall(x, dirX, MONSTER_RADIUS, arena.width - MONSTER_RADIUS);
     const toWallY = distanceToWall(y, dirY, MONSTER_RADIUS, arena.height - MONSTER_RADIUS);
@@ -136,7 +151,9 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
     if (travel < step) {
       flying = false;
       stunnedLeft = STUNNED_SECONDS;
+      return "wallHit";
     }
+    return "none";
   }
 
   /**
@@ -166,24 +183,22 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
   return {
     arena,
     tick(dt) {
-      if (caught) return;
+      if (caught) return "none";
       catchSeconds += dt;
       drainDizzy(dt);
       if (stunnedLeft > 0) {
         stunnedLeft = Math.max(0, stunnedLeft - dt);
         if (stunnedLeft === 0) dashOff();
-        return;
+        return "none";
       }
-      if (flying) {
-        flyTowardsWall(dt);
-        return;
-      }
+      if (flying) return flyTowardsWall(dt);
       const frameSpeed = speed();
       dashLeft = Math.max(0, dashLeft - dt);
       x += dirX * frameSpeed * dt;
       y += dirY * frameSpeed * dt;
       ({ pos: x, dir: dirX } = bounce(x, dirX, MONSTER_RADIUS, arena.width - MONSTER_RADIUS));
       ({ pos: y, dir: dirY } = bounce(y, dirY, MONSTER_RADIUS, arena.height - MONSTER_RADIUS));
+      return "none";
     },
     monster: () => ({
       x,
@@ -198,6 +213,7 @@ export function createGameCore({ dice }: GameCoreDeps): GameCore {
       readyToCatch: readyToCatch(),
       sleepy: catchSeconds >= SLEEPY_AFTER_SECONDS,
       caught,
+      voice,
     }),
     bonk(at) {
       if (caught || Math.hypot(at.x - x, at.y - y) > MONSTER_RADIUS + TOUCH_SLOP) return "miss";

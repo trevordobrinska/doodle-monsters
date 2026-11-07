@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCore, runUntil, swipeAcross, tapMonster } from "./testing";
+import { buildCore, runUntil, swipeAcross, tapMonster, tickResultsFor } from "./testing";
 
 describe("a Flick", () => {
   it("adds two steps of Dizzy", () => {
@@ -64,6 +64,23 @@ describe("a Flick", () => {
     runUntil(core, () => !core.monster().stunned, 5);
     core.tick(1 / 60);
     expect(core.monster().x).not.toBeCloseTo(x);
+  });
+
+  it("reports the moment the flung Monster hits the wall, once", () => {
+    const core = buildCore();
+    core.flick(swipeAcross(core));
+
+    const results = tickResultsFor(core, 3);
+
+    expect(results.filter((r) => r === "wallHit")).toHaveLength(1);
+  });
+
+  it("doesn't report ordinary bounces off the walls as wall hits", () => {
+    const core = buildCore();
+    // Long enough to bounce off several walls.
+    const results = tickResultsFor(core, 20);
+
+    expect(results).not.toContain("wallHit");
   });
 
   it("can't be Bonked or Flicked again while it's flying", () => {

@@ -12,6 +12,8 @@ _Avoid_: defeat, kill, fight, beat
 
 **Flick**: a quick swipe across a moving Monster that flings it into a wall. It counts as two Bonks.
 
+**Voice**: how a Monster's sounds are pitched, a little higher or lower than everyone else's. It's chosen once, so the Monster always sounds like itself.
+
 **Stunned**: the short moment after a Bonk when the Monster wobbles in place and can't be Bonked again.
 
 **Dizzy**: how worn out a Monster is during a Catch. It fades if the Monster goes too long without a Bonk. When a Monster is fully Dizzy, one more tap catches it.

@@ -1,4 +1,4 @@
-import { createGameCore, type GameCore, type Point } from "./gameCore";
+import { createGameCore, type GameCore, type Point, type TickResult } from "./gameCore";
 import { seededDice, type Clock } from "./deps";
 
 /** A clock that only moves when the test says so. */
@@ -24,6 +24,14 @@ export function runFor(core: GameCore, seconds: number, onFrame?: () => void): v
     core.tick(dt);
     onFrame?.();
   }
+}
+
+/** Like `runFor`, but returns what each tick reported. */
+export function tickResultsFor(core: GameCore, seconds: number): TickResult[] {
+  const dt = 1 / 60;
+  const results: TickResult[] = [];
+  for (let elapsed = 0; elapsed < seconds; elapsed += dt) results.push(core.tick(dt));
+  return results;
 }
 
 /** Taps right on the middle of the Monster, wherever it is now. */
