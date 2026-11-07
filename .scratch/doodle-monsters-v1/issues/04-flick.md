@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 (First Catch).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Rendering layer tells a tap from a quick swipe and sends Flick events with the swipe path; the thresholds live in this layer
 - [x] Core: a Flick whose path crosses the moving Monster adds two steps of Dizzy and sends it flying in the swipe direction until it hits a wall

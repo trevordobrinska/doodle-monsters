@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Walking skeleton).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Core: a tap that hits the moving Monster is a Bonk and adds one step of Dizzy; a miss does nothing
 - [x] Core: after a Bonk the Monster is Stunned for about 1 s, and taps during that window don't add Dizzy
