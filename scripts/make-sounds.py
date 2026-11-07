@@ -1,12 +1,11 @@
 """
-Makes the placeholder sound effects in public/sounds/.
+Makes the game's sound effects in public/sounds/.
 
-These are stand-ins until we find sounds we love. They're synthesised here
-(plain sine sweeps and a little noise), so there's nothing to license. To
-replace one, drop the new file into public/sounds/ and update FILES in
-src/sound/sound.ts. Delete this script once all four are replaced.
+They're synthesised here (plain sine sweeps and a little noise), so there's
+nothing to license. To change a sound, tweak its function below and run this
+again; the output is the same every run.
 
-Run from the repo root:  python scripts/make-temp-sounds.py
+Run from the repo root:  python scripts/make-sounds.py
 """
 
 import math

@@ -52,7 +52,7 @@ Throwaway page → GitHub Pages → approve in Parent Dashboard → check on an 
 - **Backup/Restore:** buttons anyone can use (no parent gate) that save and load a file. This depends on what the Night 1 test shows for Kids profiles. If it's blocked, the backup moves to the server below.
 
 ## Sound
-Kenney.nl CC0 sound effects, with the pitch changed in code for each Monster. No music in V1.
+Our own synthesised sound effects (made by `scripts/make-sounds.py`), with the pitch changed in code for each Monster. No music in V1. We first planned Kenney.nl CC0 effects, but the synthesised stand-ins playtested well, so they're kept for V1.
 
 ## Bio
 - **V1:** a fill-in-the-blanks generator that uses real facts about the drawing (number of eyes, main color, Temperament). Works offline.
