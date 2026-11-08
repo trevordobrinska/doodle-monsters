@@ -77,7 +77,7 @@ describe("Tricks", () => {
   });
 
   it("Monsters with other Temperaments play no Trick yet", () => {
-    for (const temperament of ["speedy", "bouncy", "sturdy", "sleepy"] as const) {
+    for (const temperament of ["speedy", "bouncy", "sleepy"] as const) {
       expect(trickTimeAt(catchWith({ temperament }), 5, 100)).toBe(0);
     }
   });
@@ -109,7 +109,7 @@ describe("Fade", () => {
     let faintest = 1;
     runUntil(core, () => {
       const trick = core.monster().trick;
-      if (!trick) return true;
+      if (trick?.trick !== "fade") return true;
       seconds += 1 / 60;
       faintest = Math.min(faintest, trick.opacity);
       return false;
@@ -133,8 +133,78 @@ describe("Fade", () => {
     const core = fadedSneaky();
     // Let some Dizzy drain, so the Flick adds Dizzy rather than catching it.
     runUntil(core, () => core.monster().dizzy <= 3, 60);
-    runUntil(core, () => core.monster().trick !== undefined && core.monster().trick!.opacity < 0.5);
+    runUntil(core, () => {
+      const trick = core.monster().trick;
+      return trick?.trick === "fade" && trick.opacity < 0.5;
+    });
 
     expect(core.flick(swipeAcross(core))).toBe("flick");
+  });
+});
+
+describe("Shell", () => {
+  /** Waits until the Shy Monster (stored as `sturdy`) curls up, and is free to be Bonked. */
+  function curledShy(): GameCore {
+    const core = catchWith({ temperament: "sturdy" });
+    for (let i = 0; i < 5; i++) {
+      runUntil(core, () => !core.monster().stunned);
+      expect(tapMonster(core)).toBe("bonk");
+    }
+    runUntil(core, () => core.monster().trick?.trick === "shell" && !core.monster().stunned);
+    return core;
+  }
+
+  it("a tap on a curled Shy Monster goes boing", () => {
+    const core = curledShy();
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(core.monster().stunned).toBe(false);
+  });
+
+  it("a Flick on a curled Shy Monster still adds two steps", () => {
+    const core = curledShy();
+    // Let some Dizzy drain, so the Flick adds Dizzy rather than catching it.
+    runUntil(core, () => core.monster().dizzy <= 3 && core.monster().trick?.trick === "shell" && !core.monster().stunned);
+    const before = core.monster().dizzy;
+
+    expect(core.flick(swipeAcross(core))).toBe("flick");
+    expect(core.monster().dizzy).toBe(before + 2);
+    expect(core.monster().trick).toBeUndefined();
+  });
+
+  it("a Shy Monster stays curled for about a second, and spends most of the Catch uncurled", () => {
+    const core = curledShy();
+    let seconds = 0;
+    runUntil(core, () => {
+      if (!core.monster().trick) return true;
+      seconds += 1 / 60;
+      return false;
+    });
+
+    expect(seconds).toBeGreaterThan(0.6);
+    expect(seconds).toBeLessThan(1.6);
+    expect(trickTimeAt(catchWith({ temperament: "sturdy" }), 5, 100)).toBeLessThan(0.4);
+  });
+
+  it("a fully Dizzy Shy Monster doesn't curl up, so the final catching tap always works", () => {
+    const core = catchWith({ temperament: "sturdy" });
+    for (let i = 0; i < 5; i++) {
+      runUntil(core, () => !core.monster().stunned);
+      tapMonster(core);
+    }
+    runUntil(core, () => {
+      const m = core.monster();
+      return m.dizzy === 5 && !m.stunned && !m.trick;
+    });
+    expect(tapMonster(core)).toBe("bonk");
+    let curled = false;
+    runFor(core, 30, () => {
+      if (core.monster().trick) curled = true;
+    });
+
+    expect(curled).toBe(false);
+    expect(tapMonster(core)).toBe("caught");
   });
 });
