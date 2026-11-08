@@ -1,6 +1,6 @@
 import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
 import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, springinessFor, type Pupil } from "./googlyEyes";
-import { curledUp, type AfterImageView } from "../core/tricks";
+import { curledUp, type AfterImageView, type TrickView } from "../core/tricks";
 import { createLetterbox } from "./letterbox";
 
 /**
@@ -71,20 +71,44 @@ const halfH = (m: MonsterView) => m.height / 2;
 /** 0 when standing still, up to 1 at normal running speed: how hard it hops. */
 const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP_SPEED);
 
-
-/** How visible the Monster is drawn, Googly Eyes and all: faint while it Fades. */
-const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity : 1);
-
-/** How high it's drawn off the ground while it hops sideways in a Dodge. */
-const dodgeLift = (m: MonsterView) => (m.trick?.trick === "dodge" ? m.trick.lift : 0);
-/** How far the Monster is curled up in its Shell: 0 not at all, 1 squashed small and hiding. */
-const curl = (m: MonsterView) => (m.trick?.trick === "shell" ? m.trick.curl : 0);
-
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
-/** Dozing: Sleepy's Trick, drawn with drooping eyes and a 💤. */
-const isDozing = (m: MonsterView) => m.trick?.trick === "doze";
+/** How the Trick a Monster is playing changes the way it's drawn. */
+interface TrickLook {
+  /** How visible it is, Googly Eyes and all: faint while it Fades. */
+  readonly opacity: number;
+  /** How high it's drawn off the ground: while it hops sideways in a Dodge. */
+  readonly lift: number;
+  /** How far curled up in its Shell: 0 not at all, 1 squashed small and hiding. */
+  readonly curl: number;
+  /** Drooping eyes: curled up, or dozing. */
+  readonly eyesShut: boolean;
+  /** A 💤 over it: dozing. */
+  readonly zzz: boolean;
+  /** Speedy's fake copy, drawn behind it, if it has left one. */
+  readonly fake: AfterImageView | undefined;
+}
+
+/** How a Monster playing no Trick is drawn. */
+const NO_TRICK: TrickLook = { opacity: 1, lift: 0, curl: 0, eyesShut: false, zzz: false, fake: undefined };
+
+/** Each Trick's effect on how the Monster is drawn, all in one place. */
+function trickLook(trick: TrickView | undefined): TrickLook {
+  if (!trick) return NO_TRICK;
+  switch (trick.trick) {
+    case "fade":
+      return { ...NO_TRICK, opacity: trick.opacity };
+    case "dodge":
+      return { ...NO_TRICK, lift: trick.lift };
+    case "shell":
+      return { ...NO_TRICK, curl: trick.curl, eyesShut: trick.curl > 0.5 };
+    case "doze":
+      return { ...NO_TRICK, eyesShut: true, zzz: true };
+    case "afterImage":
+      return { ...NO_TRICK, fake: trick };
+  }
+}
 
 /**
  * `image` is the kid's drawing, trimmed to its ink. It's drawn stretched to
@@ -235,7 +259,8 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
 
     const m = core.monster();
     for (const s of swooshes) drawSwoosh(s);
-    if (m.trick?.trick === "afterImage") drawAfterImage(m, m.trick);
+    const { fake } = trickLook(m.trick);
+    if (fake) drawAfterImage(m, fake);
     drawMonster(m);
     if (m.stunned) drawOrbitingStars(m);
     if (m.caught) drawBubble(m);
@@ -252,7 +277,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
 
   /** Where the Monster's centre is drawn this frame. */
   function drawnAt(m: MonsterView): Point {
-    return { x: m.x, y: m.y + bubbleBob(m) - hop(m) - dodgeLift(m) };
+    return { x: m.x, y: m.y + bubbleBob(m) - hop(m) - trickLook(m.trick).lift };
   }
 
   /**
@@ -275,6 +300,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
   }
 
   function drawMonster(m: MonsterView) {
+    const look = trickLook(m.trick);
     // Squash & stretch: a Bonk flattens it, then it springs back with an overshoot.
     let sx = 1;
     let sy = 1;
@@ -295,7 +321,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     const heading = Math.atan2(m.vy, m.vx);
 
     ctx.save();
-    ctx.globalAlpha = opacity(m);
+    ctx.globalAlpha = look.opacity;
     const at = drawnAt(m);
     ctx.translate(at.x, at.y);
     if (stretch > 0.01) {
@@ -317,8 +343,8 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     ctx.scale(sx, sy);
     if (m.stunned && squash === 0 && wallBump === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
     // Curled up in its Shell: squashed small onto the ground, eyes shut, trembling a little.
-    if (curl(m) > 0) {
-      const c = curl(m);
+    if (look.curl > 0) {
+      const c = look.curl;
       // The same shape the core hits it with: what you see is what you can hit.
       const curled = curledUp({ x: 0, y: 0, width: m.width, height: m.height }, c);
       ctx.translate(Math.sin(time * 40) * 1.5 * c, curled.y);
@@ -333,12 +359,12 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, {
         pupil: pupils.get(eye.id)?.offset ?? { x: 0, y: 0 },
         spiral: hasSpiralEyes(m) ? time * 6 * (i % 2 === 0 ? 1 : -1) : undefined,
-        sleepy: m.sleepy || curl(m) > 0.5 || isDozing(m),
+        sleepy: m.sleepy || look.eyesShut,
       });
     });
     ctx.restore();
 
-    if (isDozing(m)) {
+    if (look.zzz) {
       ctx.font = "36px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("💤", m.x + halfW(m) * 0.8, m.y - halfH(m) + Math.sin(time * 3) * 4);

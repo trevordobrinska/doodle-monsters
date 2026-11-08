@@ -21,8 +21,23 @@ _Avoid_: defeat, kill, fight, beat
 **Temperament**: the personality a kid picks for their Monster from a short list. It decides how the Monster behaves during its Catch and shows up in its Bio.
 _Avoid_: difficulty, class, type
 
-**Trick**: a Temperament's signature move during a Catch, such as fading out or dodging a tap. A Trick can fool a kid but never undoes their Dizzy. The Monster uses it more often as it gets more Dizzy, and stops once it's sleepy.
+**Trick**: a Temperament's signature move during a Catch, such as fading out or dodging a tap. A Trick can fool a kid but never undoes their Dizzy. The Monster uses it more often as it gets more Dizzy, and stops once it's sleepy. The Tricks are **After-image**, **Fade**, **Dodge**, **Shell** and **Doze**.
 _Avoid_: power, special, attack
+
+**After-image**: Speedy's Trick. As it dashes off after a Bonk, it sometimes leaves a **fake** behind: a still copy of itself, Googly Eyes and all, that fades away after about a second. Tapping the fake **pops** it with a "boing."
+_Avoid_: ghost, clone, decoy
+
+**Fade**: Sneaky's Trick. It goes almost, but not fully, invisible for about a second. It can still be Bonked and Flicked meanwhile.
+_Avoid_: vanish, invisibility
+
+**Dodge**: Bouncy's Trick. Just as a finger lands on it, it hops sideways out of the way and the tap goes "boing." It never Dodges twice in a row, and never Dodges a Flick.
+_Avoid_: jump, evade
+
+**Shell**: Shy's Trick. It curls up small for about a second, and taps on it go "boing." A Flick still flings it into the wall and uncurls it.
+_Avoid_: hide, block, shield
+
+**Doze**: Sleepy's Trick. It stops and dozes. The first tap or Flick only wakes it with a "boing," and the next one counts as normal. Not the same as a Monster getting sleepy when a Catch runs long.
+_Avoid_: nap (that's **Napping**), sleep
 
 **Bio**: a short, silly description of a Monster, written from what it looks like and its Temperament. It appears on the Monster's Name Card.
 _Avoid_: description, story

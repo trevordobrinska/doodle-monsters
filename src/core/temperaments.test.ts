@@ -80,17 +80,17 @@ describe("Temperaments", () => {
   });
 
   it("a Shy Monster shakes off a Bonk sooner than a Sleepy one", () => {
-    const sturdy = stunnedSeconds(catchWith({ temperament: "sturdy" }));
+    const shy = stunnedSeconds(catchWith({ temperament: "sturdy" }));
     const sleepy = stunnedSeconds(catchWith({ temperament: "sleepy" }));
 
-    expect(sturdy).toBeLessThan(sleepy * 0.8);
+    expect(shy).toBeLessThan(sleepy * 0.8);
   });
 
   it("a Speedy Monster dashes off in a bigger burst than a Shy one", () => {
     const speedy = dashBurst(catchWith({ temperament: "speedy" }));
-    const sturdy = dashBurst(catchWith({ temperament: "sturdy" }));
+    const shy = dashBurst(catchWith({ temperament: "sturdy" }));
 
-    expect(speedy).toBeGreaterThan(sturdy * 1.2);
+    expect(speedy).toBeGreaterThan(shy * 1.2);
   });
 
   it("a Speedy Monster goes in straight lines between walls", () => {
@@ -110,10 +110,10 @@ describe("Temperaments", () => {
   });
 
   it("a Shy Monster gets over being Dizzy faster than a Sleepy one", () => {
-    const sturdy = drainSeconds(catchWith({ temperament: "sturdy" }));
+    const shy = drainSeconds(catchWith({ temperament: "sturdy" }));
     const sleepy = drainSeconds(catchWith({ temperament: "sleepy" }));
 
-    expect(sturdy).toBeLessThan(sleepy * 0.8);
+    expect(shy).toBeLessThan(sleepy * 0.8);
   });
 });
 
