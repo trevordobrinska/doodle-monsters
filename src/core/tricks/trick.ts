@@ -51,24 +51,30 @@ export interface TrickPlay {
   tap?(at: Point, onMonster: boolean): "boing" | undefined;
   /** A Flick that crossed the Monster. Return "boing" to shrug it off, or undefined to let it work as normal. */
   flick?(): "boing" | undefined;
-  /** The Monster just dashed off after being Stunned. */
-  dashedOff?(): void;
 }
+
+/**
+ * When a Trick is played. Either every so often: about this many seconds
+ * from the end of one go to the start of the next. Or on some of the dashes
+ * the Monster makes after being Stunned: about this share of them. Both are
+ * for a Monster nearly fully Dizzy: it's played less often while less Dizzy,
+ * and more often in hard mode.
+ */
+export type TrickTiming = { readonly everySeconds: number } | { readonly shareOfDashes: number };
 
 /** A Temperament's signature Trick. */
 export interface Trick {
-  /**
-   * About how often it's played, in seconds from the end of one go to the
-   * start of the next, when the Monster is nearly fully Dizzy. It's played
-   * less often while less Dizzy, and more often in hard mode.
-   */
-  readonly everySeconds: number;
+  readonly timing: TrickTiming;
   /**
    * Whether it can fool a tap or a Flick. A Trick that can never starts once
    * the Monster is fully Dizzy, and stops if it becomes fully Dizzy, so the
    * final catching tap always works.
    */
   readonly getsInTheWay: boolean;
-  /** Starts a go at the Trick. Only ever called while the Monster runs free: not Stunned, flung or sleepy. */
+  /**
+   * Starts a go at the Trick. Only ever called while the Monster runs free
+   * (not Stunned, flung or sleepy), or, for a Trick played on dashes, just
+   * as it dashes off, before it has moved.
+   */
   play(body: TrickBody): TrickPlay;
 }

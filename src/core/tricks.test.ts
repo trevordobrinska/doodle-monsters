@@ -145,14 +145,17 @@ describe("After-image", () => {
 
   /**
    * Bonks a Speedy Monster up to `dizzy`, then keeps Bonking it whenever
-   * it's free until it leaves an after-image as it dashes off. The default
-   * leaves room for 2 more Bonks before it's fully Dizzy.
+   * it's free until it leaves an after-image as it dashes off at that much
+   * Dizzy. The default leaves room for 2 more Bonks before it's fully Dizzy.
    */
   function speedyWithAfterImage(dizzy = 4): GameCore {
     const core = catchWith({ temperament: "speedy" });
+    let hadFake = false;
     runUntil(core, () => {
-      if (fakeOf(core)) return true;
       const m = core.monster();
+      const justLeftOne = fakeOf(core) !== undefined && !hadFake;
+      hadFake = fakeOf(core) !== undefined;
+      if (justLeftOne && m.dizzy === dizzy) return true;
       if (!m.stunned && m.dizzy < dizzy) tapMonster(core);
       return false;
     });
@@ -218,6 +221,45 @@ describe("After-image", () => {
     expect(seconds).toBeGreaterThan(0.7);
     expect(seconds).toBeLessThan(1.6);
     expect(lastOpacity).toBeLessThan(0.3);
+  });
+
+  it("whether a dash leaves an after-image is up to the ramp, not how long since the last one", () => {
+    /** Dashes, and how many left a fake, after a quick Bonk and after a slow one. */
+    const after = { quick: { dashes: 0, fakes: 0 }, slow: { dashes: 0, fakes: 0 } };
+    for (let seed = 1; seed <= 20; seed++) {
+      const core = buildCore(seed, undefined, { temperament: "speedy", hardMode: true });
+      let wasStunned = false;
+      /** How long it's run free with no fake about, before the last Bonk. */
+      let freeFor = 0;
+      let bonkedAfter = 0;
+      runUntil(core, () => {
+        const m = core.monster();
+        if (wasStunned && !m.stunned) {
+          const tally = bonkedAfter < 1.9 ? after.quick : after.slow;
+          tally.dashes++;
+          if (fakeOf(core)) tally.fakes++;
+        }
+        wasStunned = m.stunned;
+        freeFor = m.stunned || fakeOf(core) ? 0 : freeFor + 1 / 60;
+        // Kept near the top of the ramp, and Bonked only once any fake is
+        // gone, so every dash is free to leave one. How long the kid takes
+        // depends on how soon its Dizzy drains back below 5.
+        const kidReady = m.dizzy < 4 ? !m.stunned : freeFor > 1.5;
+        if (kidReady && m.dizzy < 5) {
+          bonkedAfter = freeFor;
+          tapMonster(core);
+        }
+        return m.sleepy;
+      });
+    }
+    const share = ({ dashes, fakes }: { dashes: number; fakes: number }) => fakes / dashes;
+
+    expect(after.quick.dashes).toBeGreaterThan(50);
+    expect(after.slow.dashes).toBeGreaterThan(50);
+    expect(share(after.slow)).toBeGreaterThan(0);
+    // "Sometimes", even for a slow kid near the top of the ramp in hard mode.
+    expect(share(after.slow)).toBeLessThan(0.8);
+    expect(Math.abs(share(after.slow) - share(after.quick))).toBeLessThan(0.15);
   });
 
   it("there's only one after-image at a time", () => {

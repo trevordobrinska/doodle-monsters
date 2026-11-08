@@ -15,7 +15,7 @@ const DOZE_SECONDS = 3;
  * Monster is easy to find.
  */
 export const DOZE: Trick = {
-  everySeconds: 4,
+  timing: { everySeconds: 4 },
   getsInTheWay: true,
   play(body) {
     let phase: "dozing" | "woken" | "over" = "dozing";

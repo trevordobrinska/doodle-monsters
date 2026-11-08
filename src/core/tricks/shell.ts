@@ -15,7 +15,7 @@ const SHELL_SECONDS = { curling: 0.12, curled: 0.8, uncurling: 0.15 };
  * and uncurls it. Outside those moments, Bonks work as normal.
  */
 export const SHELL: Trick = {
-  everySeconds: 3.5,
+  timing: { everySeconds: 3.5 },
   getsInTheWay: true,
   play() {
     const total = SHELL_SECONDS.curling + SHELL_SECONDS.curled + SHELL_SECONDS.uncurling;

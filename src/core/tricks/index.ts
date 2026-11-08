@@ -90,12 +90,15 @@ export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
     if (playing.over() || state().sleepy || (trick()?.getsInTheWay && fullyDizzy())) playing = undefined;
   }
 
-  function maybeStart(t: Trick, dt: number) {
-    const { runningFree, sleepy } = state();
-    if (!runningFree || sleepy || (t.getsInTheWay && fullyDizzy())) return;
+  /** Whether a new go could start now: not once sleepy, nor fully Dizzy if it gets in the way. */
+  const mayStart = (t: Trick) => !playing && !state().sleepy && !(t.getsInTheWay && fullyDizzy());
+
+  /** For a Trick played every so often: counts down while it runs free, and starts a go at 0. */
+  function countDown(t: Trick, everySeconds: number, dt: number) {
+    if (!state().runningFree || !mayStart(t)) return;
     const p = pace();
     if (p === 0) return;
-    waitLeft ??= t.everySeconds * (1 - WAIT_SPREAD + 2 * WAIT_SPREAD * body.dice.roll());
+    waitLeft ??= everySeconds * (1 - WAIT_SPREAD + 2 * WAIT_SPREAD * body.dice.roll());
     waitLeft -= dt * p;
     if (waitLeft > 0) return;
     waitLeft = undefined;
@@ -109,8 +112,8 @@ export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
       if (playing) {
         playing.tick(dt);
         stopIfOver();
-      } else {
-        maybeStart(t, dt);
+      } else if ("everySeconds" in t.timing) {
+        countDown(t, t.timing.everySeconds, dt);
       }
     },
     tap(at, onMonster) {
@@ -126,8 +129,10 @@ export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
       return result;
     },
     dashedOff() {
-      playing?.dashedOff?.();
-      stopIfOver();
+      // For a Trick played on dashes, the ramp sets how likely this dash is to start a go.
+      const t = trick();
+      if (!t || !("shareOfDashes" in t.timing) || !mayStart(t)) return;
+      if (body.dice.roll() < t.timing.shareOfDashes * pace()) playing = t.play(body);
     },
     speed: () => playing?.speed?.() ?? 1,
     view: () => playing?.view(),

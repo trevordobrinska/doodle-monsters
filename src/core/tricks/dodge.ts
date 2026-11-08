@@ -22,7 +22,7 @@ const HOP_HEIGHT = 0.35;
  * one works as normal. Flicks are never Dodged.
  */
 export const DODGE: Trick = {
-  everySeconds: 2.5,
+  timing: { everySeconds: 2.5 },
   getsInTheWay: true,
   play(body) {
     let phase: "ready" | "hopping" | "spent" | "over" = "ready";

@@ -19,7 +19,7 @@ const FAINTEST = 0.12;
  * second. Bonks and Flicks work as normal meanwhile.
  */
 export const FADE: Trick = {
-  everySeconds: 3,
+  timing: { everySeconds: 3 },
   getsInTheWay: false,
   play() {
     const total = FADE_SECONDS.out + FADE_SECONDS.faint + FADE_SECONDS.back;
