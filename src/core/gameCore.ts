@@ -354,6 +354,9 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
   const halfW = () => width / 2;
   const halfH = () => height / 2;
 
+  /** The nearest x to this that keeps the whole Monster inside the arena. */
+  const insideX = (to: number) => Math.min(arena.width - halfW(), Math.max(halfW(), to));
+
   const tricks = createTricks(
     {
       get x() {
@@ -371,15 +374,16 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
       dice,
       dashOff,
       shift(dx, dy) {
-        x = Math.min(arena.width - halfW(), Math.max(halfW(), x + dx));
+        x = insideX(x + dx);
         y = Math.min(arena.height - halfH(), Math.max(halfH(), y + dy));
       },
+      roomTowards: (dx) => Math.abs(insideX(x + dx) - x),
     },
+    FULL_DIZZY,
     () => ({
       temperament,
       hardMode: hardMode(),
       dizzy,
-      fullDizzy: FULL_DIZZY,
       runningFree: stunnedLeft === 0 && !flying,
       sleepy: sleepy(),
     }),

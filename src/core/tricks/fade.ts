@@ -1,3 +1,4 @@
+import { lasts, strengthAt, type Envelope } from "./envelope";
 import type { Trick } from "./trick";
 
 export interface FadeView {
@@ -10,7 +11,7 @@ export interface FadeView {
 }
 
 /** A Fade lasts about a second: fading out, staying faint, then coming back. */
-const FADE_SECONDS = { out: 0.2, faint: 0.7, back: 0.25 };
+const FADE_SECONDS: Envelope = { up: 0.2, hold: 0.7, down: 0.25 };
 /** Almost, but not fully, invisible. */
 const FAINTEST = 0.12;
 
@@ -22,17 +23,10 @@ export const FADE: Trick = {
   timing: { everySeconds: 3 },
   getsInTheWay: false,
   play() {
-    const total = FADE_SECONDS.out + FADE_SECONDS.faint + FADE_SECONDS.back;
     let t = 0;
-    /** 0 while fully visible, up to 1 while faintest. */
-    function faintness() {
-      if (t < FADE_SECONDS.out) return t / FADE_SECONDS.out;
-      if (t < FADE_SECONDS.out + FADE_SECONDS.faint) return 1;
-      return Math.max(0, (total - t) / FADE_SECONDS.back);
-    }
     return {
-      view: () => ({ trick: "fade", opacity: 1 - (1 - FAINTEST) * faintness() }),
-      over: () => t >= total,
+      view: () => ({ trick: "fade", opacity: 1 - (1 - FAINTEST) * strengthAt(FADE_SECONDS, t) }),
+      over: () => t >= lasts(FADE_SECONDS),
       tick(dt) {
         t += dt;
       },

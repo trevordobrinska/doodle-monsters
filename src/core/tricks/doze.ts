@@ -1,4 +1,4 @@
-import type { Trick } from "./trick";
+import type { Fooled, Trick } from "./trick";
 
 export interface DozeView {
   readonly trick: "doze";
@@ -20,7 +20,7 @@ export const DOZE: Trick = {
   play(body) {
     let phase: "dozing" | "woken" | "over" = "dozing";
     let t = 0;
-    function hit(): "boing" | undefined {
+    function hit(): Fooled {
       if (phase !== "dozing") {
         // The hit after waking it always works as normal.
         phase = "over";

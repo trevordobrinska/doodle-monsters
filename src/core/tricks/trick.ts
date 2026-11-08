@@ -1,5 +1,5 @@
 import type { Dice } from "../deps";
-import type { Point } from "../gameCore";
+import type { FlickResult, Point, TapResult } from "../gameCore";
 import type { Oval } from "../oval";
 import type { AfterImageView } from "./afterImage";
 import type { DodgeView } from "./dodge";
@@ -19,6 +19,13 @@ export type TrickView =
   | AfterImageView;
 
 /**
+ * What a Trick makes of a tap or Flick: "boing" if it fooled it, turning it
+ * into a harmless boing (no Dizzy, no penalty), or undefined to let it work
+ * as normal.
+ */
+export type Fooled = Extract<TapResult | FlickResult, "boing"> | undefined;
+
+/**
  * What a Trick can see of, and do to, the Monster playing it. It has no way
  * to touch Dizzy: a Trick can fool a kid, but never undoes their Dizzy.
  */
@@ -32,6 +39,8 @@ export interface TrickBody {
   dashOff(): void;
   /** Jumps by this much, staying inside the arena. */
   shift(dx: number, dy: number): void;
+  /** How far it could move by `dx` along x before a wall stops it: from 0 up to the size of `dx`. */
+  roomTowards(dx: number): number;
 }
 
 /** One go at a Trick, from when the Monster starts playing it until it's over. */
@@ -51,12 +60,11 @@ export interface TrickPlay {
   hitArea?(usual: Oval): Oval;
   /**
    * A tap at `at` (arena coordinates). `onMonster` says whether it landed on
-   * the Monster itself. Return "boing" to turn the tap into a harmless boing
-   * (no Dizzy, no penalty), or undefined to let it work as normal.
+   * the Monster itself.
    */
-  tap?(at: Point, onMonster: boolean): "boing" | undefined;
-  /** A Flick that crossed the Monster. Return "boing" to shrug it off, or undefined to let it work as normal. */
-  flick?(): "boing" | undefined;
+  tap?(at: Point, onMonster: boolean): Fooled;
+  /** A Flick that crossed the Monster. */
+  flick?(): Fooled;
 }
 
 /**

@@ -1,23 +1,23 @@
 import type { Point } from "../gameCore";
 import type { Oval } from "../oval";
-import type { Temperament } from "../temperaments";
+import { tightenTrickRamp, type Temperament, type TrickRamp } from "../temperaments";
 import { AFTER_IMAGE } from "./afterImage";
 import { DODGE } from "./dodge";
 import { DOZE } from "./doze";
 import { FADE } from "./fade";
 import { SHELL } from "./shell";
-import type { Trick, TrickBody, TrickPlay, TrickView } from "./trick";
+import type { Fooled, Trick, TrickBody, TrickPlay, TrickView } from "./trick";
 
-export type { TrickBody, TrickView } from "./trick";
+export type { Fooled, TrickBody, TrickView } from "./trick";
 export type { AfterImageView } from "./afterImage";
 export { curledUp } from "./shell";
 
 /**
- * Each Temperament's signature Trick. A Temperament without one plays no
- * Trick. To add a Trick: write it in its own file, like `fade.ts`, add its
- * view to `TrickView` in `trick.ts`, and list it here.
+ * Each Temperament's signature Trick. To add a Trick: write it in its own
+ * file, like `fade.ts`, add its view to `TrickView` in `trick.ts`, and list
+ * it here.
  */
-const TRICKS: Partial<Record<Temperament, Trick>> = {
+const TRICKS: Record<Temperament, Trick> = {
   sneaky: FADE,
   bouncy: DODGE,
   sturdy: SHELL,
@@ -26,16 +26,12 @@ const TRICKS: Partial<Record<Temperament, Trick>> = {
 };
 
 /**
- * How Tricks ramp up during a Catch. None until the Monster has this many
- * steps of Dizzy (2 Bonks, or 1 Flick), then more and more often as it gets
- * more Dizzy, most often when fully Dizzy. `often` scales the whole ramp.
+ * How Tricks ramp up during a Catch in normal mode. None until the Monster
+ * has 2 steps of Dizzy (2 Bonks, or 1 Flick), then more and more often as it
+ * gets more Dizzy, most often when fully Dizzy. Hard mode tightens it, along
+ * with everything else it tightens: see `tightenTrickRamp`.
  */
-const RAMP = { fromDizzy: 2, often: 1 };
-/**
- * Part of hard mode's one tightening: Tricks start sooner and happen more
- * often. The Tricks themselves stay the same.
- */
-const HARD_RAMP = { fromDizzy: 1, often: 1.6 };
+const RAMP: TrickRamp = { fromDizzy: 2, often: 1 };
 /** The wait between goes varies by this much either way, so Tricks don't come like clockwork. */
 const WAIT_SPREAD = 0.4;
 
@@ -44,7 +40,6 @@ export interface TrickState {
   readonly temperament: Temperament | undefined;
   readonly hardMode: boolean;
   readonly dizzy: number;
-  readonly fullDizzy: number;
   /** Not Stunned or flung: a new Trick can only start then. */
   readonly runningFree: boolean;
   readonly sleepy: boolean;
@@ -58,9 +53,9 @@ export interface TrickState {
 export interface Tricks {
   tick(dt: number): void;
   /** A tap, before it's judged: "boing" if the Trick fooled it, undefined to judge it as normal. */
-  tap(at: Point, onMonster: boolean): "boing" | undefined;
+  tap(at: Point, onMonster: boolean): Fooled;
   /** A Flick that crossed the Monster, before it's judged: "boing" if the Trick shrugged it off. */
-  flick(): "boing" | undefined;
+  flick(): Fooled;
   dashedOff(): void;
   /** How fast the Monster moves, as a share of its usual speed. */
   speed(): number;
@@ -70,7 +65,8 @@ export interface Tricks {
   view(): TrickView | undefined;
 }
 
-export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
+/** `fullDizzy` is how many steps of Dizzy make a Monster fully Dizzy, ready to be caught. */
+export function createTricks(body: TrickBody, fullDizzy: number, state: () => TrickState): Tricks {
   let playing: TrickPlay | undefined;
   /** Until the next go, in seconds at the peak of the ramp. Rolled when first needed. */
   let waitLeft: number | undefined;
@@ -79,12 +75,12 @@ export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
     const { temperament } = state();
     return temperament && TRICKS[temperament];
   };
-  const fullyDizzy = () => state().dizzy >= state().fullDizzy;
+  const fullyDizzy = () => state().dizzy >= fullDizzy;
 
   /** 0 for no Tricks, up to 1 (more in hard mode) at the peak of the ramp. */
   function pace(): number {
-    const { dizzy, fullDizzy, hardMode } = state();
-    const { fromDizzy, often } = hardMode ? HARD_RAMP : RAMP;
+    const { dizzy, hardMode } = state();
+    const { fromDizzy, often } = hardMode ? tightenTrickRamp(RAMP) : RAMP;
     if (dizzy < fromDizzy) return 0;
     return (often * (dizzy - fromDizzy + 1)) / (fullDizzy - fromDizzy + 1);
   }

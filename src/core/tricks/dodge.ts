@@ -34,12 +34,7 @@ export const DODGE: Trick = {
     function hopSideways(fingerX: number) {
       const distance = body.width * HOP_WIDTHS;
       const away = fingerX > body.x ? -1 : fingerX < body.x ? 1 : body.dice.roll() < 0.5 ? -1 : 1;
-      // Try the hop to see how much room there is, then take it back: the
-      // Monster moves along it frame by frame.
-      const start = body.x;
-      body.shift(away * distance, 0);
-      const room = Math.abs(body.x - start);
-      body.shift(start - body.x, 0);
+      const room = body.roomTowards(away * distance);
       hopDx = room >= distance / 2 ? away * room : -away * distance;
     }
 

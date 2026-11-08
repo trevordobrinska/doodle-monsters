@@ -1,4 +1,5 @@
 import type { Oval } from "../oval";
+import { lasts, strengthAt, type Envelope } from "./envelope";
 import type { Trick } from "./trick";
 
 export interface ShellView {
@@ -8,7 +9,7 @@ export interface ShellView {
 }
 
 /** It stays curled for about a second: curling up, staying curled, then peeking out again. */
-const SHELL_SECONDS = { curling: 0.12, curled: 0.8, uncurling: 0.15 };
+const SHELL_SECONDS: Envelope = { up: 0.12, hold: 0.8, down: 0.15 };
 /** How much of its width and height it shrinks by when fully curled. */
 const SHRINK = { width: 0.35, height: 0.45 };
 
@@ -37,13 +38,9 @@ export const SHELL: Trick = {
   timing: { everySeconds: 3.5 },
   getsInTheWay: true,
   play() {
-    const total = SHELL_SECONDS.curling + SHELL_SECONDS.curled + SHELL_SECONDS.uncurling;
+    const total = lasts(SHELL_SECONDS);
     let t = 0;
-    function curl() {
-      if (t < SHELL_SECONDS.curling) return t / SHELL_SECONDS.curling;
-      if (t < SHELL_SECONDS.curling + SHELL_SECONDS.curled) return 1;
-      return Math.max(0, (total - t) / SHELL_SECONDS.uncurling);
-    }
+    const curl = () => strengthAt(SHELL_SECONDS, t);
     return {
       view: () => ({ trick: "shell", curl: curl() }),
       over: () => t >= total,

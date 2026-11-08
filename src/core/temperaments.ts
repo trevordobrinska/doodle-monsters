@@ -49,10 +49,19 @@ export const BEHAVIORS: Record<Temperament, Behavior> = {
 
 /**
  * Hard mode's one tightening, applied to every Temperament alike: faster,
- * bigger dashes, shorter Stunned and quicker-draining Dizzy. How it wanders
- * stays the same, so each Temperament still feels like itself.
+ * bigger dashes, shorter Stunned and quicker-draining Dizzy, and Tricks
+ * that start this many steps of Dizzy sooner and happen this much more
+ * often. How it wanders and the Tricks themselves stay the same, so each
+ * Temperament still feels like itself.
  */
-const HARD_MODE = { speed: 1.3, dashBoost: 1.4, stunnedSeconds: 0.75, drainStepSeconds: 0.65 };
+const HARD_MODE = {
+  speed: 1.3,
+  dashBoost: 1.4,
+  stunnedSeconds: 0.75,
+  drainStepSeconds: 0.65,
+  tricksSooner: 1,
+  tricksMoreOften: 1.6,
+};
 
 export function tighten(behavior: Behavior): Behavior {
   return {
@@ -61,5 +70,23 @@ export function tighten(behavior: Behavior): Behavior {
     dashBoost: behavior.dashBoost * HARD_MODE.dashBoost,
     stunnedSeconds: behavior.stunnedSeconds * HARD_MODE.stunnedSeconds,
     drainStepSeconds: behavior.drainStepSeconds * HARD_MODE.drainStepSeconds,
+  };
+}
+
+/**
+ * How Tricks ramp up during a Catch: none until the Monster has `fromDizzy`
+ * steps of Dizzy, then more and more often as it gets more Dizzy. `often`
+ * scales the whole ramp.
+ */
+export interface TrickRamp {
+  readonly fromDizzy: number;
+  readonly often: number;
+}
+
+/** Hard mode's tightening of the Trick ramp: Tricks start sooner and happen more often. */
+export function tightenTrickRamp(ramp: TrickRamp): TrickRamp {
+  return {
+    fromDizzy: ramp.fromDizzy - HARD_MODE.tricksSooner,
+    often: ramp.often * HARD_MODE.tricksMoreOften,
   };
 }

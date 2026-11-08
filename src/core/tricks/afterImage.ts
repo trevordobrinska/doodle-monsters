@@ -1,4 +1,5 @@
-import type { Point } from "../gameCore";
+import { onOval, type Oval } from "../oval";
+import { lasts, strengthAt, type Envelope } from "./envelope";
 import type { Trick } from "./trick";
 
 export interface AfterImageView {
@@ -10,8 +11,8 @@ export interface AfterImageView {
   readonly opacity: number;
 }
 
-/** The fake stands still for about a second, then fades away. */
-const FAKE_SECONDS = { still: 0.8, fading: 0.3 };
+/** The fake appears at once, stands still for about a second, then fades away. */
+const FAKE_SECONDS: Envelope = { up: 0, hold: 0.8, down: 0.3 };
 
 /**
  * ⚡ Speedy's Trick: on some of its dashes after a Bonk, it leaves a fake
@@ -24,29 +25,18 @@ export const AFTER_IMAGE: Trick = {
   getsInTheWay: true,
   play(body) {
     // Played just as the Monster dashes off: the fake stands right where it is.
-    const fake: Point = { x: body.x, y: body.y };
-    const width = body.width;
-    const height = body.height;
+    const fake: Oval = { x: body.x, y: body.y, width: body.width, height: body.height };
     let t = 0;
     let popped = false;
-    const total = FAKE_SECONDS.still + FAKE_SECONDS.fading;
 
     return {
-      view: () => ({
-        trick: "afterImage",
-        x: fake.x,
-        y: fake.y,
-        opacity: Math.min(1, (total - t) / FAKE_SECONDS.fading),
-      }),
-      over: () => popped || t >= total,
+      view: () => ({ trick: "afterImage", x: fake.x, y: fake.y, opacity: strengthAt(FAKE_SECONDS, t) }),
+      over: () => popped || t >= lasts(FAKE_SECONDS),
       tick(dt) {
         t += dt;
       },
       tap(at, onMonster) {
-        if (onMonster) return undefined;
-        const dx = (at.x - fake.x) / (width / 2);
-        const dy = (at.y - fake.y) / (height / 2);
-        if (dx * dx + dy * dy > 1) return undefined;
+        if (onMonster || !onOval(at, fake)) return undefined;
         popped = true;
         return "boing";
       },
