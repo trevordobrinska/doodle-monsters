@@ -38,6 +38,14 @@ describe("the Bio", () => {
     expect(one).toMatch(/\bsleepy\b/i);
   });
 
+  it("a Monster stored as sturdy is Shy in its Bio, with shy habits", () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const bio = catchMonster({ seed, temperament: "sturdy" }).zoo()[0].bio;
+      expect(bio).toMatch(/\bshy\b/i);
+      expect(bio).not.toMatch(/sturdy|rock|pillows|wind/i);
+    }
+  });
+
   it("the same dice gives the same Bio", () => {
     const bioFor = (seed: number) => catchMonster({ seed, eyes: 2, temperament: "bouncy" }).zoo()[0].bio;
 
@@ -71,6 +79,7 @@ describe("the Bio", () => {
 
     const { bio } = reloaded.zoo()[0];
     expect(bio).toMatch(/four googly eyes/i);
+    expect(bio).toMatch(/\bshy\b/i);
     expect((await storage.list())[0].bio).toBe(bio);
   });
 });

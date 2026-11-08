@@ -34,7 +34,7 @@ export const BIO_WORDS = {
     speedy: ["zooms round the Habitat before breakfast", "runs so fast its shadow can't keep up", "races butterflies, and wins"],
     sneaky: ["tiptoes everywhere, even in its sleep", "hides behind tiny pebbles", "plays hide-and-seek with itself"],
     bouncy: ["boings higher than a tree", "can't stop hopping, even at bedtime", "bounces on puddles for fun"],
-    sturdy: ["never falls over, not even in a big wind", "can carry a whole pile of pillows", "stands as still as a rock when it's thinking"],
+    sturdy: ["hides behind its own tail when someone says hello", "goes pink as a strawberry when you wave at it", "peeks out from under a leaf to see who's there"],
     sleepy: ["naps nine times a day", "yawns louder than a lion", "snores little bubbles"],
   } satisfies Record<Temperament, readonly string[]>,
   /** How each number of Googly Eyes is said, from one to five. */

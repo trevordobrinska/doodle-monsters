@@ -67,6 +67,11 @@ function drainSeconds(core: GameCore): number {
 }
 
 describe("Temperaments", () => {
+  it("kids see the sturdy Temperament as Shy, while its stored value stays sturdy", () => {
+    expect(TEMPERAMENTS.find((t) => t.id === "sturdy")).toMatchObject({ word: "Shy", icon: "🙈" });
+    expect(TEMPERAMENTS.map((t) => t.word)).not.toContain("Sturdy");
+  });
+
   it("a Speedy Monster moves faster than a Sleepy one", () => {
     const speedy = catchWith({ temperament: "speedy" });
     const sleepy = catchWith({ temperament: "sleepy" });
@@ -74,14 +79,14 @@ describe("Temperaments", () => {
     expect(groundCovered(speedy, 10)).toBeGreaterThan(groundCovered(sleepy, 10) * 1.3);
   });
 
-  it("a Sturdy Monster shakes off a Bonk sooner than a Sleepy one", () => {
+  it("a Shy Monster shakes off a Bonk sooner than a Sleepy one", () => {
     const sturdy = stunnedSeconds(catchWith({ temperament: "sturdy" }));
     const sleepy = stunnedSeconds(catchWith({ temperament: "sleepy" }));
 
     expect(sturdy).toBeLessThan(sleepy * 0.8);
   });
 
-  it("a Speedy Monster dashes off in a bigger burst than a Sturdy one", () => {
+  it("a Speedy Monster dashes off in a bigger burst than a Shy one", () => {
     const speedy = dashBurst(catchWith({ temperament: "speedy" }));
     const sturdy = dashBurst(catchWith({ temperament: "sturdy" }));
 
@@ -104,7 +109,7 @@ describe("Temperaments", () => {
     expect(speedy.slowest).toBeCloseTo(speedy.fastest);
   });
 
-  it("a Sturdy Monster gets over being Dizzy faster than a Sleepy one", () => {
+  it("a Shy Monster gets over being Dizzy faster than a Sleepy one", () => {
     const sturdy = drainSeconds(catchWith({ temperament: "sturdy" }));
     const sleepy = drainSeconds(catchWith({ temperament: "sleepy" }));
 
