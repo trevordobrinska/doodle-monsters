@@ -42,6 +42,7 @@ Throwaway page → GitHub Pages → approve in Parent Dashboard → check on an 
    - A **Flick** across a moving Monster flings it into a wall and counts as 2 steps.
    - At full Dizzy it gets spiral eyes, and one last tap catches it in a bubble.
    - The Temperament shapes its behavior. A hard mode toggle tightens everything.
+   - **Tricks (added 2026-11-08, spec in `.scratch/catch-tricks/`):** each Temperament has a signature Trick. Speedy leaves an After-image, Sneaky Fades, Bouncy Dodges, Shy (formerly Sturdy) curls into its Shell, and Sleepy Dozes. Tricks start after 2 Bonks and come more often as Dizzy builds. They come sooner and more often in hard mode, and stop once the Monster is sleepy. Being fooled only goes "boing." Kids discover Tricks on their own, with no descriptions.
    - **A Catch can't fail.** If the kid leaves, the Monster naps and the Catch resumes later. After about 2 minutes it gets sleepy and slows down.
 5. **Zoo:** the Monster moves into its Habitat. Monsters wander and bounce, and their Googly Eyes follow your finger. Tap one for its **Name Card** (name, large picture, date drawn, Temperament, Bio, Say Goodbye).
 
@@ -64,5 +65,5 @@ Our own synthesised sound effects (made by `scripts/make-sounds.py`), with the p
 - Mesh warping (jelly bending) for more lifelike motion
 
 ## Still open (small; decide while building)
-- The exact Temperament list and what each one does (start with something like Speedy, Sneaky, Bouncy, Sturdy, Sleepy)
+- The exact Temperament list and what each one does (now Speedy, Sneaky, Bouncy, Shy, Sleepy)
 - The word lists for names and Bios (a family evening project)

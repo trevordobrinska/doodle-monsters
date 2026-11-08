@@ -21,6 +21,9 @@ _Avoid_: defeat, kill, fight, beat
 **Temperament**: the personality a kid picks for their Monster from a short list. It decides how the Monster behaves during its Catch and shows up in its Bio.
 _Avoid_: difficulty, class, type
 
+**Trick**: a Temperament's signature move during a Catch, such as fading out or dodging a tap. A Trick can fool a kid but never undoes their Dizzy. The Monster uses it more often as it gets more Dizzy, and stops once it's sleepy.
+_Avoid_: power, special, attack
+
 **Bio**: a short, silly description of a Monster, written from what it looks like and its Temperament. It appears on the Monster's Name Card.
 _Avoid_: description, story
 
