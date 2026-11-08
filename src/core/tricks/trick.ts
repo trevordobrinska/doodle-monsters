@@ -1,5 +1,6 @@
 import type { Dice } from "../deps";
 import type { Point } from "../gameCore";
+import type { AfterImageView } from "./afterImage";
 import type { DodgeView } from "./dodge";
 import type { DozeView } from "./doze";
 import type { FadeView } from "./fade";
@@ -13,7 +14,8 @@ export type TrickView =
   | FadeView
   | ShellView
   | DozeView
-  | DodgeView;
+  | DodgeView
+  | AfterImageView;
 
 /**
  * What a Trick can see of, and do to, the Monster playing it. It has no way
@@ -33,8 +35,8 @@ export interface TrickBody {
 
 /** One go at a Trick, from when the Monster starts playing it until it's over. */
 export interface TrickPlay {
-  /** What the renderer is told while it plays. */
-  view(): TrickView;
+  /** What the renderer is told while it plays, or undefined while there's nothing to show yet. */
+  view(): TrickView | undefined;
   /** Whether it's over. Asked after every tick, tap and Flick. */
   over(): boolean;
   /** Time passes, in seconds. It keeps playing while the Monster is Stunned or flung. */

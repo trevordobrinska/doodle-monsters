@@ -1,5 +1,6 @@
 import type { Point } from "../gameCore";
 import type { Temperament } from "../temperaments";
+import { AFTER_IMAGE } from "./afterImage";
 import { DODGE } from "./dodge";
 import { DOZE } from "./doze";
 import { FADE } from "./fade";
@@ -18,6 +19,7 @@ const TRICKS: Partial<Record<Temperament, Trick>> = {
   bouncy: DODGE,
   sturdy: SHELL,
   sleepy: DOZE,
+  speedy: AFTER_IMAGE,
 };
 
 /**
