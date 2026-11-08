@@ -74,6 +74,9 @@ const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP
 /** How visible the Monster is drawn, Googly Eyes and all: faint while it Fades. */
 const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity : 1);
 
+/** How far the Monster is curled up in its Shell: 0 not at all, 1 squashed small and hiding. */
+const curl = (m: MonsterView) => (m.trick?.trick === "shell" ? m.trick.curl : 0);
+
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
@@ -309,6 +312,12 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     }
     ctx.scale(sx, sy);
     if (m.stunned && squash === 0 && wallBump === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
+    // Curled up in its Shell: squashed small onto the ground, eyes shut, trembling a little.
+    if (curl(m) > 0) {
+      const c = curl(m);
+      ctx.translate(Math.sin(time * 40) * 1.5 * c, halfH(m) * 0.45 * c);
+      ctx.scale(1 - 0.35 * c, 1 - 0.45 * c);
+    }
 
     ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
 
@@ -318,7 +327,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, {
         pupil: pupils.get(eye.id)?.offset ?? { x: 0, y: 0 },
         spiral: hasSpiralEyes(m) ? time * 6 * (i % 2 === 0 ? 1 : -1) : undefined,
-        sleepy: m.sleepy || isDozing(m),
+        sleepy: m.sleepy || curl(m) > 0.5 || isDozing(m),
       });
     });
     ctx.restore();
