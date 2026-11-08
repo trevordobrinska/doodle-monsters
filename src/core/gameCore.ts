@@ -85,7 +85,12 @@ export interface ZooMonsterView {
   readonly drawnAt: string;
   /** Its short, silly Bio, written once when it was caught. Empty while Napping. */
   readonly bio: string;
-  /** Where it is in the Habitat, which is the same size as the arena. */
+  /**
+   * Which Habitat it lives in, counting from 0. It stays there: catching
+   * and Saying Goodbye never move the others about.
+   */
+  readonly habitat: number;
+  /** Where it is in its Habitat, which is the same size as the arena. */
   readonly x: number;
   readonly y: number;
   /** Its size in arena units, as during its Catch. */
@@ -132,8 +137,19 @@ export interface GameCore {
    * Habitat. Call once when the app opens, before showing the Zoo.
    */
   loadZoo(): Promise<void>;
-  /** Every Monster in the Zoo, Napping ones included, oldest drawing first. */
+  /** Every Monster in the Zoo, Napping ones included, in every Habitat. */
   zoo(): readonly ZooMonsterView[];
+  /**
+   * How many Habitats the Zoo is split into. Each holds about 10 Monsters
+   * at most, so the screen never gets too crowded. Always at least one.
+   */
+  habitatCount(): number;
+  /** Which Habitat the kid is looking at, counting from 0. */
+  shownHabitat(): number;
+  /** The Monsters in the Habitat the kid is looking at. */
+  monstersShown(): readonly ZooMonsterView[];
+  /** The kid moves to another Habitat. Returns whether it's a Habitat there is. */
+  showHabitat(index: number): boolean;
   /** Settles once everything changed so far is saved. Rejects if saving failed. */
   saved(): Promise<void>;
   /**
@@ -141,7 +157,7 @@ export interface GameCore {
    * from): the Monster goes to the Zoo Napping. Returns whether it went.
    */
   leave(): boolean;
-  /** The Zoo Monster at a point in the Habitat (the one in front, if several), or undefined. */
+  /** The Zoo Monster at a point in the Habitat shown (the one in front, if several), or undefined. */
   zooMonsterAt(at: Point): ZooMonsterView | undefined;
   /** The kid tapped a Napping Monster: back to its Catch. Returns whether it resumed. */
   resume(id: string): boolean;
@@ -541,6 +557,9 @@ const HABITAT_TURN_SECONDS = { min: 2, max: 5 };
 /** ...turning by up to this many degrees either way. */
 const HABITAT_MAX_TURN = 70;
 
+/** The most Monsters a Habitat holds, so the screen stays uncrowded and smooth. */
+const HABITAT_SIZE = 10;
+
 /** A Monster Saying Goodbye waves for this many seconds... */
 const GOODBYE_WAVE_SECONDS = 1.5;
 /** ...then walks out of the nearer side of the Habitat at this speed, in pixels per second. */
@@ -581,7 +600,10 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
    * tablet closes the app without warning.
    */
   let catching: MonsterRecord | undefined;
-  let habitat: HabitatMonster[] = [];
+  /** The Zoo, split into Habitats. A Monster stays in its Habitat until it leaves. */
+  let habitats: HabitatMonster[][] = [[]];
+  /** Which Habitat the kid is looking at. */
+  let shown = 0;
   let saving: Promise<void> = Promise.resolve();
   /** Monsters the kid Said Goodbye to, so loading the Zoo again never brings one back. */
   const goneIds = new Set<string>();
@@ -606,6 +628,40 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       turnIn: turnDelay(),
     };
   }
+
+  const everyone = () => habitats.flat();
+  const hasRoom = (habitat: readonly HabitatMonster[]) => habitat.filter((h) => !h.goodbye).length < HABITAT_SIZE;
+
+  /**
+   * A Monster arrives in the Zoo. It goes into the Habitat it's kept in, if
+   * there's room; else the Habitat shown, if there's room (so the kid sees
+   * it arrive); else the first with room; else a new Habitat. Nobody else
+   * moves. Its record notes the Habitat, to save. Returns the Habitat.
+   */
+  function settle(h: HabitatMonster, preferShown: boolean): number {
+    const kept = h.record.habitat;
+    while (kept !== undefined && kept >= habitats.length) habitats = [...habitats, []];
+    let index =
+      kept !== undefined && hasRoom(habitats[kept])
+        ? kept
+        : preferShown && hasRoom(habitats[shown])
+          ? shown
+          : habitats.findIndex(hasRoom);
+    if (index < 0) {
+      habitats = [...habitats, []];
+      index = habitats.length - 1;
+    }
+    habitats[index] = [...habitats[index], h];
+    h.record = { ...h.record, schemaVersion: MONSTER_SCHEMA_VERSION, habitat: index };
+    return index;
+  }
+
+  /** Takes a Monster out of its Habitat. The Habitat stays, even if it's now empty. */
+  function unsettle(h: HabitatMonster) {
+    habitats = habitats.map((habitat) => habitat.filter((other) => other !== h));
+  }
+
+  const find = (id: string) => everyone().find((h) => h.record.id === id);
 
   /** One change to storage after another, and one failing doesn't stop the next. */
   function store(change: () => Promise<void>) {
@@ -637,10 +693,10 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
   function moveIntoZoo() {
     if (!catching) return;
     // The Bio is written once, now, and kept with the Monster for good.
-    const record: MonsterRecord = { ...catching, bio: generateBio(dice, catching), status: "zoo" };
+    const h = intoHabitat({ ...catching, bio: generateBio(dice, catching), status: "zoo" }, round.monster());
     catching = undefined;
-    habitat = [...habitat, intoHabitat(record, round.monster())];
-    save(record);
+    shown = settle(h, true);
+    save(h.record);
   }
 
   /**
@@ -654,7 +710,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     return written;
   }
 
-  function view(h: HabitatMonster): ZooMonsterView {
+  function view(h: HabitatMonster, habitat: number): ZooMonsterView {
     const napping = h.record.status === "napping";
     const waving = (h.goodbye?.waveLeft ?? 0) > 0;
     const still = napping || waving;
@@ -667,6 +723,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       eyes: h.eyes,
       drawnAt: h.record.drawnAt,
       bio: h.record.bio,
+      habitat,
       x: h.x,
       y: h.y,
       width: h.width,
@@ -681,7 +738,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
   }
 
   function wander(dt: number) {
-    for (const h of habitat) {
+    for (const h of everyone()) {
       if (h.record.status === "napping") continue;
       if (h.goodbye) {
         walkAway(h, h.goodbye, dt);
@@ -724,23 +781,40 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     async loadZoo() {
       const records = await storage.list();
       // Skip Monsters already here, and the one being caught right now.
-      const here = new Set([...habitat.map((h) => h.record.id), catching?.id]);
-      const arriving = records
-        .filter((r) => !here.has(r.id) && !goneIds.has(r.id))
-        .map(withBio)
-        .map((r) => intoHabitat(r, { x: dice.roll() * arena.width, y: dice.roll() * arena.height }));
-      habitat = [...habitat, ...arriving];
+      const here = new Set([...everyone().map((h) => h.record.id), catching?.id]);
+      const arriving = records.filter((r) => !here.has(r.id) && !goneIds.has(r.id)).map(withBio);
+      // Each back in the Habitat it's kept in. Then any not in one yet, oldest
+      // first, filling each Habitat before starting the next, and saved there.
+      const kept = arriving.filter((r) => r.habitat !== undefined);
+      const unplaced = arriving.filter((r) => r.habitat === undefined);
+      for (const r of [...kept, ...unplaced]) {
+        const h = intoHabitat(r, { x: dice.roll() * arena.width, y: dice.roll() * arena.height });
+        if (settle(h, false) !== r.habitat) save(h.record);
+      }
+      // A Napping Monster is waiting to be resumed: open where the kid can see it.
+      const napping = habitats.findIndex((habitat) => habitat.some((h) => h.record.status === "napping"));
+      if (napping >= 0) shown = napping;
     },
-    zoo: () => habitat.map(view),
+    zoo: () => habitats.flatMap((habitat, i) => habitat.map((h) => view(h, i))),
+    habitatCount: () => habitats.length,
+    shownHabitat: () => shown,
+    monstersShown: () => habitats[shown].map((h) => view(h, shown)),
+    showHabitat(index) {
+      if (!Number.isInteger(index) || index < 0 || index >= habitats.length) return false;
+      shown = index;
+      return true;
+    },
     zooMonsterAt(at) {
       // Nearer the bottom is drawn in front, so it's the one a tap lands on.
-      const hit = habitat.filter((h) => !h.goodbye && onOval(at, h, h.width, h.height)).sort((a, b) => b.y - a.y)[0];
-      return hit && view(hit);
+      const hit = habitats[shown]
+        .filter((h) => !h.goodbye && onOval(at, h, h.width, h.height))
+        .sort((a, b) => b.y - a.y)[0];
+      return hit && view(hit, shown);
     },
     resume(id) {
-      const h = habitat.find((h) => h.record.id === id);
-      if (!inZoo || h?.record.status !== "napping") return false;
-      habitat = habitat.filter((other) => other !== h);
+      const h = find(id);
+      if (!inZoo || !h || h.record.status !== "napping") return false;
+      unsettle(h);
       round = createRound(dice, () => hardMode, h.record);
       drawing = undefined;
       catching = h.record;
@@ -748,7 +822,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       return true;
     },
     sayGoodbye(id) {
-      const h = habitat.find((h) => h.record.id === id);
+      const h = find(id);
       if (!inZoo || !h || h.goodbye) return false;
       h.goodbye = { waveLeft: GOODBYE_WAVE_SECONDS, dirX: h.x < arena.width / 2 ? -1 : 1 };
       goneIds.add(id);
@@ -766,7 +840,10 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     },
     leave() {
       if (inZoo || round.phase() !== "catch" || round.monster().caught || !catching) return false;
-      habitat = [...habitat, intoHabitat(catching, round.monster())];
+      const h = intoHabitat(catching, round.monster());
+      shown = settle(h, true);
+      // Saving as it leaves may not finish; if not, it finds a Habitat again next time.
+      save(h.record);
       catching = undefined;
       inZoo = true;
       return true;
@@ -807,7 +884,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     tick(dt) {
       if (inZoo) {
         wander(dt);
-        habitat = habitat.filter((h) => !(h.goodbye && outOfSight(h)));
+        habitats = habitats.map((habitat) => habitat.filter((h) => !(h.goodbye && outOfSight(h))));
         return "none";
       }
       return round.tick(dt);

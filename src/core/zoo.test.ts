@@ -95,7 +95,7 @@ describe("the Zoo", () => {
 
     const [record] = await storage.list();
     expect(record).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: expect.any(String),
       name,
       image: AN_IMAGE,
@@ -106,6 +106,7 @@ describe("the Zoo", () => {
       mainColor: "purple",
       drawnAt: "2026-11-07T12:00:00.000Z",
       status: "zoo",
+      habitat: 0,
     });
   });
 

@@ -4,7 +4,7 @@ import type { Temperament } from "./temperaments";
  * The version of the Monster record below. Bump it whenever the record's
  * shape changes, so an old backup or a future server can tell what it holds.
  */
-export const MONSTER_SCHEMA_VERSION = 1;
+export const MONSTER_SCHEMA_VERSION = 2;
 
 /** Where a Monster is: waiting for its Catch to finish, or living in the Zoo. */
 export type MonsterStatus = "napping" | "zoo";
@@ -32,6 +32,12 @@ export interface MonsterRecord {
   /** When the drawing was finished, as an ISO 8601 date and time. */
   readonly drawnAt: string;
   readonly status: MonsterStatus;
+  /**
+   * Which of the Zoo's Habitats it lives in, counting from 0, so it's in
+   * the same one each time the app opens. Missing until it first moves into
+   * the Zoo, and on Monsters saved before Habitats (schema version 1).
+   */
+  readonly habitat?: number;
 }
 
 /** A whole Zoo, as Backup writes it out and Restore reads it back. */

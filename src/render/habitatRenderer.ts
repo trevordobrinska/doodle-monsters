@@ -7,7 +7,9 @@ import { createLetterbox } from "./letterbox";
  * and hopping about, Googly Eyes jiggling, and watching the kid's finger
  * while they touch the screen. Napping Monsters doze where they are, with a
  * 💤. A Monster Saying Goodbye rocks and waves 👋, then hops away out of
- * the Habitat. Holds no game rules.
+ * the Habitat. Only the Habitat the kid is looking at is drawn, on its own
+ * ground, and moving to another one slides it in from that side. Holds no
+ * game rules.
  */
 export interface HabitatRenderer {
   resize(): void;
@@ -20,8 +22,17 @@ export interface HabitatRenderer {
   draw(dt: number, finger: Point | undefined): void;
 }
 
-const GRASS = "#c8eba0";
-const TUFT = "#8fcf63";
+/** Each Habitat has its own ground and tufts, so the kid can tell them apart. They take turns. */
+const GROUNDS = [
+  { ground: "#c8eba0", tuft: "#8fcf63" }, // meadow
+  { ground: "#f6e3a8", tuft: "#d9b45a" }, // sandy
+  { ground: "#cfe6f5", tuft: "#8fbcdb" }, // frosty
+  { ground: "#e6d4f2", tuft: "#b893d6" }, // lilac
+  { ground: "#f8d3c4", tuft: "#e09a7f" }, // peachy
+];
+const groundFor = (habitat: number) => GROUNDS[habitat % GROUNDS.length];
+/** Seconds the next Habitat takes to slide in. */
+const SLIDE_SECONDS = 0.35;
 
 /** Wandering Monsters hop along: hops per second at strolling speed... */
 const HOPS_PER_SECOND = 2.2;
@@ -65,6 +76,13 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
   const { resize, toArena, begin } = createLetterbox(canvas, core.arena);
   const seen = new Map<string, Seen>();
   const tufts = tuftsFor(core.arena);
+  /**
+   * The Habitat drawn last frame; the one being slid away from; and how far
+   * the one shown has still to slide in (-1 to 1 of the width).
+   */
+  let lastShown = core.shownHabitat();
+  let leaving = lastShown;
+  let slide = 0;
 
   function seenFor(m: ZooMonsterView): Seen {
     let s = seen.get(m.id);
@@ -84,23 +102,51 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
   function draw(dt: number, finger: Point | undefined) {
     begin(ctx);
     const { width, height } = core.arena;
-    ctx.fillStyle = GRASS;
-    ctx.fillRect(0, 0, width, height);
-    for (const t of tufts) drawTuft(t);
+    const shown = core.shownHabitat();
+    // Moving on to the next Habitat slides it in from the right; back, from the left.
+    if (shown !== lastShown) {
+      slide = shown > lastShown ? 1 : -1;
+      leaving = lastShown;
+      lastShown = shown;
+    }
+    // Eases in: quick at first, settling gently.
+    slide *= Math.exp((-4 * dt) / SLIDE_SECONDS);
+    if (Math.abs(slide) < 0.002) slide = 0;
 
-    // Nearer the bottom is nearer the kid, so drawn on top.
-    const monsters = [...core.zoo()].sort((a, b) => a.y - b.y);
-    // Forget Monsters that left (a resumed Napping one), so one that comes
-    // back after its Catch pops in afresh.
-    if (seen.size > monsters.length) {
-      const here = new Set(monsters.map((m) => m.id));
+    // Forget Monsters that left the Zoo (a resumed Napping one), so one that
+    // comes back after its Catch pops in afresh.
+    const inZoo = core.zoo();
+    if (seen.size > inZoo.length) {
+      const here = new Set(inZoo.map((m) => m.id));
       for (const id of seen.keys()) if (!here.has(id)) seen.delete(id);
     }
-    for (const m of monsters) drawMonster(m, seenFor(m), dt, finger);
+
+    ctx.save();
+    // Keep the slide inside the Habitat, off the letterbox bars.
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.clip();
+    // The Habitat being left shows behind, as the new one slides over it.
+    if (slide !== 0) {
+      ctx.fillStyle = groundFor(leaving).ground;
+      ctx.fillRect(0, 0, width, height);
+    }
+    ctx.translate(slide * width, 0);
+    const { ground, tuft } = groundFor(shown);
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, 0, width, height);
+    for (const t of tufts) drawTuft(t, tuft);
+
+    // Nearer the bottom is nearer the kid, so drawn on top.
+    const monsters = [...core.monstersShown()].sort((a, b) => a.y - b.y);
+    // Googly Eyes watch the finger where it really is, not where the slide puts it.
+    const watching = finger && { x: finger.x - slide * width, y: finger.y };
+    for (const m of monsters) drawMonster(m, seenFor(m), dt, watching);
+    ctx.restore();
   }
 
-  function drawTuft({ x, y }: Point) {
-    ctx.strokeStyle = TUFT;
+  function drawTuft({ x, y }: Point, color: string) {
+    ctx.strokeStyle = color;
     ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.beginPath();

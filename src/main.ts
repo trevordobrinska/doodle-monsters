@@ -43,6 +43,9 @@ const nameCardRoot = document.querySelector<HTMLElement>("#name-card");
 if (!nameCardRoot) throw new Error("Missing #name-card");
 const firstTimeArrow = zooRoot.querySelector<HTMLElement>(".first-time")!;
 const drawButton = zooRoot.querySelector<HTMLButtonElement>(".draw")!;
+const previousHabitatButton = zooRoot.querySelector<HTMLButtonElement>(".habitat-arrow.previous")!;
+const nextHabitatButton = zooRoot.querySelector<HTMLButtonElement>(".habitat-arrow.next")!;
+const habitatDots = zooRoot.querySelector<HTMLElement>(".habitat-dots")!;
 
 const sound = createSound();
 
@@ -122,8 +125,37 @@ function showZoo() {
   canvas!.hidden = false;
   habitat.resize();
   showFirstTimeArrow();
+  showHabitatControls();
   zooRoot!.hidden = false;
 }
+
+/** A Zoo split into several Habitats gets ◀ ▶ to move between them, and a dot for each. */
+let controlsFor = "";
+function showHabitatControls() {
+  const count = core.habitatCount();
+  const shown = core.shownHabitat();
+  // Only touch the page when something changed: this runs every frame.
+  if (controlsFor === `${shown}/${count}`) return;
+  controlsFor = `${shown}/${count}`;
+  previousHabitatButton.hidden = shown === 0;
+  nextHabitatButton.hidden = shown === count - 1;
+  habitatDots.hidden = count < 2;
+  habitatDots.replaceChildren(
+    ...Array.from({ length: count }, (_, i) => {
+      const dot = document.createElement("span");
+      dot.classList.toggle("shown", i === shown);
+      return dot;
+    }),
+  );
+}
+
+/** Moves to the Habitat this many along (1 is the next one), if there is one. */
+function moveHabitat(by: number) {
+  if (core.phase() !== "zoo" || !core.showHabitat(core.shownHabitat() + by)) return;
+  showHabitatControls();
+}
+previousHabitatButton.addEventListener("click", () => moveHabitat(-1));
+nextHabitatButton.addEventListener("click", () => moveHabitat(1));
 
 /** The arrow to "Draw a Monster!" shows while the Zoo is empty, as it is again after the last goodbye. */
 function showFirstTimeArrow() {
@@ -252,6 +284,13 @@ listenForGestures(canvas, (clientX, clientY) => (renderer ?? habitat).toArena(cl
     noteIfCaught(result);
   },
   onFlick(path) {
+    // In the Zoo, a sideways swipe moves to the next Habitat (swipe left) or back (swipe right).
+    if (core.phase() === "zoo") {
+      const dx = path[path.length - 1].x - path[0].x;
+      const dy = path[path.length - 1].y - path[0].y;
+      if (Math.abs(dx) > Math.abs(dy)) moveHabitat(dx < 0 ? 1 : -1);
+      return;
+    }
     if (!renderer || caughtAt !== undefined) return;
     const result = core.flick(path);
     renderer.showFlick(result, path);
@@ -281,6 +320,7 @@ function frame(now: number) {
   if (core.phase() === "zoo") {
     habitat.draw(dt, finger?.at);
     showFirstTimeArrow();
+    showHabitatControls();
   }
   else renderer?.draw(dt);
   requestAnimationFrame(frame);
