@@ -1,13 +1,19 @@
 import type { Dice } from "../deps";
 import type { Point } from "../gameCore";
 import type { DodgeView } from "./dodge";
+import type { DozeView } from "./doze";
 import type { FadeView } from "./fade";
+import type { ShellView } from "./shell";
 
 /**
  * What the renderer is told about the Trick a Monster is playing, so it can
  * draw it. Each Trick adds its own view here, told apart by `trick`.
  */
-export type TrickView = FadeView | DodgeView;
+export type TrickView =
+  | FadeView
+  | ShellView
+  | DozeView
+  | DodgeView;
 
 /**
  * What a Trick can see of, and do to, the Monster playing it. It has no way

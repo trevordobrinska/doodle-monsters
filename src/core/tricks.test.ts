@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameCore } from "./gameCore";
-import { buildCore, runFor, runUntil, swipeAcross, tapMonster, type CatchOptions } from "./testing";
+import { buildCore, runFor, runUntil, speedOf, swipeAcross, tapMonster, type CatchOptions } from "./testing";
 
 const catchWith = (options: CatchOptions) => buildCore(1, undefined, options);
 
@@ -77,7 +77,7 @@ describe("Tricks", () => {
   });
 
   it("Monsters with other Temperaments play no Trick yet", () => {
-    for (const temperament of ["speedy", "sturdy", "sleepy"] as const) {
+    for (const temperament of ["speedy"] as const) {
       expect(trickTimeAt(catchWith({ temperament }), 5, 100)).toBe(0);
     }
   });
@@ -139,6 +139,169 @@ describe("Fade", () => {
     });
 
     expect(core.flick(swipeAcross(core))).toBe("flick");
+  });
+});
+
+describe("Shell", () => {
+  /** Waits until the Shy Monster (stored as `sturdy`) curls up, and is free to be Bonked. */
+  function curledShy(): GameCore {
+    const core = catchWith({ temperament: "sturdy" });
+    for (let i = 0; i < 5; i++) {
+      runUntil(core, () => !core.monster().stunned);
+      expect(tapMonster(core)).toBe("bonk");
+    }
+    runUntil(core, () => core.monster().trick?.trick === "shell" && !core.monster().stunned);
+    return core;
+  }
+
+  it("a tap on a curled Shy Monster goes boing", () => {
+    const core = curledShy();
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(core.monster().stunned).toBe(false);
+  });
+
+  it("a Flick on a curled Shy Monster still adds two steps", () => {
+    const core = curledShy();
+    // Let some Dizzy drain, so the Flick adds Dizzy rather than catching it.
+    runUntil(core, () => core.monster().dizzy <= 3 && core.monster().trick?.trick === "shell" && !core.monster().stunned);
+    const before = core.monster().dizzy;
+
+    expect(core.flick(swipeAcross(core))).toBe("flick");
+    expect(core.monster().dizzy).toBe(before + 2);
+    expect(core.monster().trick).toBeUndefined();
+  });
+
+  it("a Shy Monster stays curled for about a second, and spends most of the Catch uncurled", () => {
+    const core = curledShy();
+    let seconds = 0;
+    runUntil(core, () => {
+      if (!core.monster().trick) return true;
+      seconds += 1 / 60;
+      return false;
+    });
+
+    expect(seconds).toBeGreaterThan(0.6);
+    expect(seconds).toBeLessThan(1.6);
+    expect(trickTimeAt(catchWith({ temperament: "sturdy" }), 5, 100)).toBeLessThan(0.4);
+  });
+
+  it("a fully Dizzy Shy Monster doesn't curl up, so the final catching tap always works", () => {
+    const core = catchWith({ temperament: "sturdy" });
+    for (let i = 0; i < 5; i++) {
+      runUntil(core, () => !core.monster().stunned);
+      tapMonster(core);
+    }
+    runUntil(core, () => {
+      const m = core.monster();
+      return m.dizzy === 5 && !m.stunned && !m.trick;
+    });
+    expect(tapMonster(core)).toBe("bonk");
+    let curled = false;
+    runFor(core, 30, () => {
+      if (core.monster().trick) curled = true;
+    });
+
+    expect(curled).toBe(false);
+    expect(tapMonster(core)).toBe("caught");
+  });
+});
+
+describe("Doze", () => {
+  /** Keeps a Sleepy Monster nearly Dizzy until it's dozing, and not Stunned. */
+  function dozingSleepy(): GameCore {
+    const core = catchWith({ temperament: "sleepy" });
+    runUntil(core, () => {
+      const m = core.monster();
+      if (m.trick?.trick === "doze") return !m.stunned;
+      if (m.dizzy < 5 && !m.stunned) expect(tapMonster(core)).toBe("bonk");
+      return false;
+    });
+    return core;
+  }
+
+  it("a dozing Monster stands still", () => {
+    const core = dozingSleepy();
+    const { x, y } = core.monster();
+    runFor(core, 0.5);
+
+    expect(speedOf(core)).toBe(0);
+    expect(core.monster()).toMatchObject({ x, y });
+  });
+
+  it("a tap on a dozing Monster wakes it without adding Dizzy", () => {
+    const core = dozingSleepy();
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(core.monster().stunned).toBe(false);
+    expect(core.monster().trick).toBeUndefined();
+  });
+
+  it("a woken Monster dashes off", () => {
+    const core = dozingSleepy();
+    tapMonster(core);
+    const { x, y } = core.monster();
+    runFor(core, 0.3);
+
+    expect(Math.hypot(core.monster().x - x, core.monster().y - y)).toBeGreaterThan(20);
+  });
+
+  it("the tap after waking it is a Bonk", () => {
+    const core = dozingSleepy();
+    tapMonster(core);
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("bonk");
+    expect(core.monster().dizzy).toBe(before + 1);
+  });
+
+  it("a Flick on a dozing Monster only wakes it", () => {
+    const core = dozingSleepy();
+    const before = core.monster().dizzy;
+
+    expect(core.flick(swipeAcross(core))).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(core.monster().flying).toBe(false);
+    expect(core.monster().trick).toBeUndefined();
+  });
+
+  it("a dozing Monster wakes on its own", () => {
+    const core = dozingSleepy();
+    let seconds = 0;
+    runUntil(
+      core,
+      () => {
+        if (core.monster().trick === undefined) return true;
+        seconds += 1 / 60;
+        return false;
+      },
+      20,
+    );
+
+    expect(seconds).toBeGreaterThan(1.5);
+    expect(seconds).toBeLessThan(6);
+    runFor(core, 0.2);
+    expect(speedOf(core)).toBeGreaterThan(0);
+  });
+
+  it("a fully Dizzy Monster doesn't Doze, so the final catching tap always works", () => {
+    const core = catchWith({ temperament: "sleepy" });
+    for (let i = 0; i < 20 && !core.monster().readyToCatch; i++) {
+      runUntil(core, () => !core.monster().stunned && core.monster().trick === undefined);
+      tapMonster(core);
+    }
+    expect(core.monster().readyToCatch).toBe(true);
+    let dozed = false;
+    runFor(core, 60, () => {
+      if (core.monster().trick) dozed = true;
+    });
+
+    expect(dozed).toBe(false);
+    expect(tapMonster(core)).toBe("caught");
   });
 });
 

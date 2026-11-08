@@ -76,9 +76,14 @@ const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity
 
 /** How high it's drawn off the ground while it hops sideways in a Dodge. */
 const dodgeLift = (m: MonsterView) => (m.trick?.trick === "dodge" ? m.trick.lift : 0);
+/** How far the Monster is curled up in its Shell: 0 not at all, 1 squashed small and hiding. */
+const curl = (m: MonsterView) => (m.trick?.trick === "shell" ? m.trick.curl : 0);
 
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
+
+/** Dozing: Sleepy's Trick, drawn with drooping eyes and a 💤. */
+const isDozing = (m: MonsterView) => m.trick?.trick === "doze";
 
 /**
  * `image` is the kid's drawing, trimmed to its ink. It's drawn stretched to
@@ -309,6 +314,12 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     }
     ctx.scale(sx, sy);
     if (m.stunned && squash === 0 && wallBump === 0) ctx.rotate(Math.sin(time * 11) * 0.12);
+    // Curled up in its Shell: squashed small onto the ground, eyes shut, trembling a little.
+    if (curl(m) > 0) {
+      const c = curl(m);
+      ctx.translate(Math.sin(time * 40) * 1.5 * c, halfH(m) * 0.45 * c);
+      ctx.scale(1 - 0.35 * c, 1 - 0.45 * c);
+    }
 
     ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
 
@@ -318,10 +329,16 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, {
         pupil: pupils.get(eye.id)?.offset ?? { x: 0, y: 0 },
         spiral: hasSpiralEyes(m) ? time * 6 * (i % 2 === 0 ? 1 : -1) : undefined,
-        sleepy: m.sleepy,
+        sleepy: m.sleepy || curl(m) > 0.5 || isDozing(m),
       });
     });
     ctx.restore();
+
+    if (isDozing(m)) {
+      ctx.font = "36px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("💤", m.x + halfW(m) * 0.8, m.y - halfH(m) + Math.sin(time * 3) * 4);
+    }
 
     if (m.sleepy && !m.caught) {
       ctx.fillStyle = INK;
