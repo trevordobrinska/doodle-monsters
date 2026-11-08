@@ -4,13 +4,13 @@
 
 **Blocked by:** 02 (Tricks ramp up during a Catch).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A dozing Monster stands still
-- [ ] A tap on a dozing Monster wakes it: no Dizzy, no penalty, and a "boing" or yawn sound (reusing an existing sound is fine). Then it dashes off.
-- [ ] A Flick on a dozing Monster also only wakes it, so the first hit always just wakes it
-- [ ] If nobody wakes it, it wakes on its own after a few seconds and carries on
-- [ ] A fully Dizzy Monster doesn't Doze, so the final catching tap always works
-- [ ] Core tests: "a tap on a dozing Monster wakes it without adding Dizzy," "the tap after waking it is a Bonk," "a dozing Monster wakes on its own"
+- [x] A dozing Monster stands still
+- [x] A tap on a dozing Monster wakes it: no Dizzy, no penalty, and a "boing" or yawn sound (reusing an existing sound is fine). Then it dashes off.
+- [x] A Flick on a dozing Monster also only wakes it, so the first hit always just wakes it
+- [x] If nobody wakes it, it wakes on its own after a few seconds and carries on
+- [x] A fully Dizzy Monster doesn't Doze, so the final catching tap always works
+- [x] Core tests: "a tap on a dozing Monster wakes it without adding Dizzy," "the tap after waking it is a Bonk," "a dozing Monster wakes on its own"
 
 ## Comments

@@ -4,13 +4,13 @@
 
 **Blocked by:** 01 (Sturdy becomes Shy), 02 (Tricks ramp up during a Catch).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A curled Monster looks curled up or hiding, for example squashed small with its eyes peeking or shut
-- [ ] A tap on a curled Monster goes "boing," with no Dizzy and no penalty
-- [ ] A Flick on a curled Monster flings it into the wall, adds its usual 2 steps of Dizzy and uncurls it
-- [ ] It stays curled for about a second, and spends most of the Catch uncurled
-- [ ] A fully Dizzy Monster doesn't curl up, so the final catching tap always works
-- [ ] Core tests: "a tap on a curled Shy Monster goes boing," "a Flick on a curled Shy Monster still adds two steps"
+- [x] A curled Monster looks curled up or hiding, for example squashed small with its eyes peeking or shut
+- [x] A tap on a curled Monster goes "boing," with no Dizzy and no penalty
+- [x] A Flick on a curled Monster flings it into the wall, adds its usual 2 steps of Dizzy and uncurls it
+- [x] It stays curled for about a second, and spends most of the Catch uncurled
+- [x] A fully Dizzy Monster doesn't curl up, so the final catching tap always works
+- [x] Core tests: "a tap on a curled Shy Monster goes boing," "a Flick on a curled Shy Monster still adds two steps"
 
 ## Comments

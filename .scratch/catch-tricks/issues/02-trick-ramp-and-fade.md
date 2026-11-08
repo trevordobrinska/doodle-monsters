@@ -4,15 +4,15 @@
 
 **Blocked by:** none.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] **Ramp (shared by every Trick):** no Tricks before the first 2 Bonks (a Flick counts as 2). After that, the more Dizzy the Monster is, the more often it plays its Trick. It plays it most often around the final catching tap.
-- [ ] **Hard mode:** Tricks start sooner and happen more often, as part of hard mode's one tightening. The Tricks themselves stay the same.
-- [ ] **Sleepy stop:** once a Monster gets sleepy (after about 2 minutes), it plays no more Tricks, so a Catch still can't fail.
-- [ ] **Never punishes:** a Trick never takes Dizzy away.
-- [ ] **Fade:** a Sneaky Monster goes almost (not fully) invisible for about a second, then comes back. Bonks and Flicks work as normal while it's faded.
-- [ ] The core reports when a Monster is playing its Trick, so the renderer can draw it. The Googly Eyes fade along with the drawing.
-- [ ] Core tests, in glossary terms, for example:
+- [x] **Ramp (shared by every Trick):** no Tricks before the first 2 Bonks (a Flick counts as 2). After that, the more Dizzy the Monster is, the more often it plays its Trick. It plays it most often around the final catching tap.
+- [x] **Hard mode:** Tricks start sooner and happen more often, as part of hard mode's one tightening. The Tricks themselves stay the same.
+- [x] **Sleepy stop:** once a Monster gets sleepy (after about 2 minutes), it plays no more Tricks, so a Catch still can't fail.
+- [x] **Never punishes:** a Trick never takes Dizzy away.
+- [x] **Fade:** a Sneaky Monster goes almost (not fully) invisible for about a second, then comes back. Bonks and Flicks work as normal while it's faded.
+- [x] The core reports when a Monster is playing its Trick, so the renderer can draw it. The Googly Eyes fade along with the drawing.
+- [x] Core tests, in glossary terms, for example:
   - "a Monster plays no Trick before its first 2 Bonks"
   - "a nearly Dizzy Monster plays its Trick more often than one just past 2 Bonks"
   - "a sleepy Monster plays no Trick"
@@ -20,7 +20,7 @@
   - "a faded Sneaky Monster can still be Bonked"
 
   Compare behavior, not exact numbers.
-- [ ] Monsters with other Temperaments play no Trick yet
-- [ ] The Temperament picker doesn't describe the Trick. Kids discover Tricks on their own.
+- [x] Monsters with other Temperaments play no Trick yet
+- [x] The Temperament picker doesn't describe the Trick. Kids discover Tricks on their own.
 
 ## Comments

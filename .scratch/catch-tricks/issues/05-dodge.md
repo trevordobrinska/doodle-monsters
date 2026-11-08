@@ -4,14 +4,14 @@
 
 **Blocked by:** 02 (Tricks ramp up during a Catch).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A tap that would have landed sometimes becomes a Dodge: the Monster hops a short way sideways, and the tap goes "boing," with no Dizzy and no penalty
-- [ ] It never dodges twice in a row, so the tap after a Dodge can always land
-- [ ] The hop is quick but easy to see, so the kid can tell it was a Dodge and not a miss
-- [ ] Flicks are never dodged
-- [ ] A fully Dizzy Monster doesn't dodge, so the final catching tap always works
-- [ ] Core tests: "a dodging Bouncy Monster turns a tap into a boing," "a Bouncy Monster never dodges twice in a row"
-- [ ] V1 ticket 08 found that Bouncy's hops feel like a "lurch," not a bounce. Check whether the Dodge fixes that. If it doesn't, leave a note on V1 ticket 15.
+- [x] A tap that would have landed sometimes becomes a Dodge: the Monster hops a short way sideways, and the tap goes "boing," with no Dizzy and no penalty
+- [x] It never dodges twice in a row, so the tap after a Dodge can always land
+- [x] The hop is quick but easy to see, so the kid can tell it was a Dodge and not a miss
+- [x] Flicks are never dodged
+- [x] A fully Dizzy Monster doesn't dodge, so the final catching tap always works
+- [x] Core tests: "a dodging Bouncy Monster turns a tap into a boing," "a Bouncy Monster never dodges twice in a row"
+- [x] V1 ticket 08 found that Bouncy's hops feel like a "lurch," not a bounce. Check whether the Dodge fixes that. If it doesn't, leave a note on V1 ticket 15.
 
 ## Comments

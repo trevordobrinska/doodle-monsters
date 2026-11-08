@@ -4,14 +4,14 @@
 
 **Blocked by:** 02 (Tricks ramp up during a Catch).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Sometimes, as a Speedy Monster dashes off, a fake copy appears where it was. The fake stays still for about a second, then fades away.
-- [ ] A tap on the fake goes "boing," with no Dizzy and no penalty, and pops it
-- [ ] A tap where the fake and the real Monster overlap counts as a Bonk on the real one
-- [ ] There's only one fake at a time
-- [ ] The core reports where the fake is, so the renderer can draw it
-- [ ] A fully Dizzy Monster leaves no fakes, so the final catching tap always works
-- [ ] Core tests: "a tap on the after-image goes boing," "a tap on the real Monster still Bonks while there's an after-image"
+- [x] Sometimes, as a Speedy Monster dashes off, a fake copy appears where it was. The fake stays still for about a second, then fades away.
+- [x] A tap on the fake goes "boing," with no Dizzy and no penalty, and pops it
+- [x] A tap where the fake and the real Monster overlap counts as a Bonk on the real one
+- [x] There's only one fake at a time
+- [x] The core reports where the fake is, so the renderer can draw it
+- [x] A fully Dizzy Monster leaves no fakes, so the final catching tap always works
+- [x] Core tests: "a tap on the after-image goes boing," "a tap on the real Monster still Bonks while there's an after-image"
 
 ## Comments
