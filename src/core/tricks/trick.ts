@@ -1,5 +1,6 @@
 import type { Dice } from "../deps";
 import type { Point } from "../gameCore";
+import type { Oval } from "../oval";
 import type { AfterImageView } from "./afterImage";
 import type { DodgeView } from "./dodge";
 import type { DozeView } from "./doze";
@@ -43,6 +44,11 @@ export interface TrickPlay {
   tick(dt: number): void;
   /** How fast the Monster moves meanwhile, as a share of its usual speed: 0 stands still. Default 1. */
   speed?(): number;
+  /**
+   * Where taps and Flicks can hit the Monster meanwhile, given its usual
+   * oval. Match what's drawn: what you see is what you can hit. Default: the usual oval.
+   */
+  hitArea?(usual: Oval): Oval;
   /**
    * A tap at `at` (arena coordinates). `onMonster` says whether it landed on
    * the Monster itself. Return "boing" to turn the tap into a harmless boing

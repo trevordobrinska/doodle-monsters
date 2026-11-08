@@ -4,6 +4,7 @@ import { NAME_WORDS } from "./nameWords";
 import { BIO_WORDS } from "./bioWords";
 import { MONSTER_SCHEMA_VERSION, type MonsterRecord, type ZooStorage } from "./zooStorage";
 import { createTricks, type TrickView } from "./tricks";
+import { crossesOval, onOval } from "./oval";
 
 export interface Arena {
   readonly width: number;
@@ -254,8 +255,6 @@ const ARENA: Arena = { width: 1280, height: 800 };
  * so a tiny or huge drawing doesn't make a Catch unfair.
  */
 const MONSTER_SIZE = 150;
-/** Taps this far outside the Monster's edge still land, for small fingers. */
-const TOUCH_SLOP = 16;
 const FULL_DIZZY = 6;
 /** How long the dash boost takes to fade back to normal speed. */
 const DASH_SECONDS = 1.5;
@@ -455,9 +454,12 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
     return undefined;
   }
 
-  /** Whether a tap (one point) or a swipe lands on the Monster. */
+  /**
+   * Whether a tap (one point) or a swipe lands on the Monster: on what's
+   * drawn of it, which its Trick can change.
+   */
   function crossesMonster(path: readonly Point[]): boolean {
-    return crossesOval(path, { x, y }, width, height);
+    return crossesOval(path, tricks.hitArea({ x, y, width, height }));
   }
 
   function drainDizzy(dt: number) {
@@ -852,7 +854,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     zooMonsterAt(at) {
       // Nearer the bottom is drawn in front, so it's the one a tap lands on.
       const hit = habitats[shown]
-        .filter((h) => !h.goodbye && onOval(at, h, h.width, h.height))
+        .filter((h) => !h.goodbye && onOval(at, h))
         .sort((a, b) => b.y - a.y)[0];
       return hit && view(hit, shown);
     },
@@ -995,40 +997,6 @@ function generateBio(dice: Dice, m: Pick<MonsterRecord, "name" | "eyes" | "mainC
 /** Keeps a point relative to the drawing's box inside the box. */
 function onDrawing(p: Point): Point {
   return { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) };
-}
-
-/**
- * Whether a tap (one point) or a swipe lands on the oval filling a Monster's
- * box, with TOUCH_SLOP of slack all round. Squashing the arena so the oval
- * becomes a unit circle turns this into a circle test.
- */
-function crossesOval(path: readonly Point[], centre: Point, width: number, height: number): boolean {
-  const rx = width / 2 + TOUCH_SLOP;
-  const ry = height / 2 + TOUCH_SLOP;
-  const squashed = path.map((p) => ({ x: (p.x - centre.x) / rx, y: (p.y - centre.y) / ry }));
-  return crossesCircle(squashed, { x: 0, y: 0 }, 1);
-}
-
-/** Whether a tap lands on the oval filling a Monster's box, centred on it. */
-function onOval(at: Point, centre: Point, width: number, height: number): boolean {
-  return crossesOval([at], centre, width, height);
-}
-
-/** Whether any leg of the path comes within `radius` of `centre`. */
-function crossesCircle(path: readonly Point[], centre: Point, radius: number): boolean {
-  if (path.length === 1) return Math.hypot(path[0].x - centre.x, path[0].y - centre.y) <= radius;
-  for (let i = 1; i < path.length; i++) {
-    if (distanceToSegment(centre, path[i - 1], path[i]) <= radius) return true;
-  }
-  return false;
-}
-
-function distanceToSegment(p: Point, a: Point, b: Point): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lengthSq = dx * dx + dy * dy;
-  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
 /** How far a position can travel along `dir` (along one axis) before it meets min or max. */

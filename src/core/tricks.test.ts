@@ -310,6 +310,40 @@ describe("Shell", () => {
     expect(core.monster().stunned).toBe(false);
   });
 
+  /** Waits until the Shy Monster is fully curled up: squashed small onto the ground. */
+  function fullyCurledShy(): GameCore {
+    const core = curledShy();
+    runUntil(core, () => {
+      const trick = core.monster().trick;
+      return trick?.trick === "shell" && trick.curl === 1;
+    });
+    return core;
+  }
+
+  it("a tap on the empty space a curled Shy Monster has shrunk away from is a miss", () => {
+    const core = fullyCurledShy();
+    const { x, y, height, dizzy } = core.monster();
+
+    expect(core.bonk({ x, y: y - height * 0.4 })).toBe("miss");
+    expect(core.monster().dizzy).toBe(dizzy);
+  });
+
+  it("a Flick that only crosses the empty space above a curled Shy Monster misses", () => {
+    const core = fullyCurledShy();
+    const { x, y, width, height } = core.monster();
+    const above = y - height * 0.4;
+
+    expect(core.flick([{ x: x - width, y: above }, { x: x + width, y: above }])).toBe("miss");
+    expect(core.monster().flying).toBe(false);
+  });
+
+  it("a tap on a curled Shy Monster, low down where it's squashed, still goes boing", () => {
+    const core = fullyCurledShy();
+    const { x, y, height } = core.monster();
+
+    expect(core.bonk({ x, y: y + height * 0.3 })).toBe("boing");
+  });
+
   it("a Flick on a curled Shy Monster still adds two steps", () => {
     const core = curledShy();
     // Let some Dizzy drain, so the Flick adds Dizzy rather than catching it.

@@ -1,4 +1,5 @@
 import type { Point } from "../gameCore";
+import type { Oval } from "../oval";
 import type { Temperament } from "../temperaments";
 import { AFTER_IMAGE } from "./afterImage";
 import { DODGE } from "./dodge";
@@ -8,6 +9,8 @@ import { SHELL } from "./shell";
 import type { Trick, TrickBody, TrickPlay, TrickView } from "./trick";
 
 export type { TrickBody, TrickView } from "./trick";
+export type { AfterImageView } from "./afterImage";
+export { curledUp } from "./shell";
 
 /**
  * Each Temperament's signature Trick. A Temperament without one plays no
@@ -61,6 +64,8 @@ export interface Tricks {
   dashedOff(): void;
   /** How fast the Monster moves, as a share of its usual speed. */
   speed(): number;
+  /** Where taps and Flicks can hit the Monster, given its usual oval: what's drawn of it. */
+  hitArea(usual: Oval): Oval;
   /** The Trick being played, for the renderer, or undefined if none. */
   view(): TrickView | undefined;
 }
@@ -135,6 +140,7 @@ export function createTricks(body: TrickBody, state: () => TrickState): Tricks {
       if (body.dice.roll() < t.timing.shareOfDashes * pace()) playing = t.play(body);
     },
     speed: () => playing?.speed?.() ?? 1,
+    hitArea: (usual) => playing?.hitArea?.(usual) ?? usual,
     view: () => playing?.view(),
   };
 }

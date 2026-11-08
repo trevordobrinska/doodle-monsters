@@ -1,6 +1,6 @@
 import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
 import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, springinessFor, type Pupil } from "./googlyEyes";
-import type { AfterImageView } from "../core/tricks/afterImage";
+import { curledUp, type AfterImageView } from "../core/tricks";
 import { createLetterbox } from "./letterbox";
 
 /**
@@ -319,8 +319,10 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     // Curled up in its Shell: squashed small onto the ground, eyes shut, trembling a little.
     if (curl(m) > 0) {
       const c = curl(m);
-      ctx.translate(Math.sin(time * 40) * 1.5 * c, halfH(m) * 0.45 * c);
-      ctx.scale(1 - 0.35 * c, 1 - 0.45 * c);
+      // The same shape the core hits it with: what you see is what you can hit.
+      const curled = curledUp({ x: 0, y: 0, width: m.width, height: m.height }, c);
+      ctx.translate(Math.sin(time * 40) * 1.5 * c, curled.y);
+      ctx.scale(curled.width / m.width, curled.height / m.height);
     }
 
     ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
