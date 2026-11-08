@@ -77,6 +77,9 @@ const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
+/** Dozing: Sleepy's Trick, drawn with drooping eyes and a 💤. */
+const isDozing = (m: MonsterView) => m.trick?.trick === "doze";
+
 /**
  * `image` is the kid's drawing, trimmed to its ink. It's drawn stretched to
  * the Monster's size from the core, so what you see is what you can hit.
@@ -315,10 +318,16 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, {
         pupil: pupils.get(eye.id)?.offset ?? { x: 0, y: 0 },
         spiral: hasSpiralEyes(m) ? time * 6 * (i % 2 === 0 ? 1 : -1) : undefined,
-        sleepy: m.sleepy,
+        sleepy: m.sleepy || isDozing(m),
       });
     });
     ctx.restore();
+
+    if (isDozing(m)) {
+      ctx.font = "36px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("💤", m.x + halfW(m) * 0.8, m.y - halfH(m) + Math.sin(time * 3) * 4);
+    }
 
     if (m.sleepy && !m.caught) {
       ctx.fillStyle = INK;
