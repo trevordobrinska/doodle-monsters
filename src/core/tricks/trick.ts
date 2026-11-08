@@ -1,6 +1,7 @@
 import type { Dice } from "../deps";
 import type { Point } from "../gameCore";
 import type { AfterImageView } from "./afterImage";
+import type { DozeView } from "./doze";
 import type { FadeView } from "./fade";
 import type { ShellView } from "./shell";
 
@@ -11,6 +12,7 @@ import type { ShellView } from "./shell";
 export type TrickView =
   | FadeView
   | ShellView
+  | DozeView
   | AfterImageView;
 
 /**
