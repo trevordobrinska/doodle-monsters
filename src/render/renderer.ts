@@ -74,6 +74,9 @@ const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP
 /** How visible the Monster is drawn, Googly Eyes and all: faint while it Fades. */
 const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity : 1);
 
+/** How high it's drawn off the ground while it hops sideways in a Dodge. */
+const dodgeLift = (m: MonsterView) => (m.trick?.trick === "dodge" ? m.trick.lift : 0);
+
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
@@ -242,7 +245,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
 
   /** Where the Monster's centre is drawn this frame. */
   function drawnAt(m: MonsterView): Point {
-    return { x: m.x, y: m.y + bubbleBob(m) - hop(m) };
+    return { x: m.x, y: m.y + bubbleBob(m) - hop(m) - dodgeLift(m) };
   }
 
   /**

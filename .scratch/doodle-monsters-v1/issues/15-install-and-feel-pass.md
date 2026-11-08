@@ -15,3 +15,5 @@
 ## Comments
 
 **2026-11-07 (from ticket 08):** When tuning the Temperaments on the tablet, check Bouncy. In the desktop playtest its hops felt like a "lurch" rather than a bounce (its speed just rises and falls; it doesn't leave the ground). Also check that normal mode takes the 7-year-old about 30–60 s for every Temperament, and that the hard mode button isn't easy to hit by accident.
+
+**2026-11-08 (from Catch Tricks ticket 05):** Bouncy's Dodge doesn't fix the "lurch". The Dodge is a rare, separate sideways hop (with a real lift off the ground) only after the first 2 Bonks; Bouncy's everyday wandering is unchanged. The lurch comes from the core's speed rising and falling (`hopping()` in `gameCore.ts`, a 0.5 s cycle) while the renderer draws every Monster's little bounce on its own timer (`hopPhase` in `renderer.ts`), so the two aren't in step. A likely fix: have the renderer's bounce follow Bouncy's speed cycle, so it's in the air when it speeds up and lands when it slows. Still judge it on the tablet first.

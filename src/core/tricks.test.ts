@@ -77,7 +77,7 @@ describe("Tricks", () => {
   });
 
   it("Monsters with other Temperaments play no Trick yet", () => {
-    for (const temperament of ["speedy", "bouncy", "sturdy", "sleepy"] as const) {
+    for (const temperament of ["speedy", "sturdy", "sleepy"] as const) {
       expect(trickTimeAt(catchWith({ temperament }), 5, 100)).toBe(0);
     }
   });
@@ -109,7 +109,7 @@ describe("Fade", () => {
     let faintest = 1;
     runUntil(core, () => {
       const trick = core.monster().trick;
-      if (!trick) return true;
+      if (trick?.trick !== "fade") return true;
       seconds += 1 / 60;
       faintest = Math.min(faintest, trick.opacity);
       return false;
@@ -133,8 +133,92 @@ describe("Fade", () => {
     const core = fadedSneaky();
     // Let some Dizzy drain, so the Flick adds Dizzy rather than catching it.
     runUntil(core, () => core.monster().dizzy <= 3, 60);
-    runUntil(core, () => core.monster().trick !== undefined && core.monster().trick!.opacity < 0.5);
+    runUntil(core, () => {
+      const trick = core.monster().trick;
+      return trick?.trick === "fade" && trick.opacity < 0.5;
+    });
 
     expect(core.flick(swipeAcross(core))).toBe("flick");
+  });
+});
+
+describe("Dodge", () => {
+  /** Waits until the Bouncy Monster, nearly fully Dizzy, is ready to Dodge and free to be Bonked. */
+  function dodgyBouncy(seed = 1, hardMode = false): GameCore {
+    const core = buildCore(seed, undefined, { temperament: "bouncy", hardMode });
+    for (let i = 0; i < 5; i++) {
+      runUntil(core, () => !core.monster().stunned);
+      expect(tapMonster(core)).toBe("bonk");
+    }
+    runUntil(core, () => core.monster().trick?.trick === "dodge" && !core.monster().stunned);
+    return core;
+  }
+
+  it("a dodging Bouncy Monster turns a tap into a boing", () => {
+    const core = dodgyBouncy();
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(core.monster().stunned).toBe(false);
+  });
+
+  it("a dodging Bouncy Monster hops sideways, out from under the finger, quickly but visibly", () => {
+    const core = dodgyBouncy();
+    const finger = { x: core.monster().x, y: core.monster().y };
+    core.bonk(finger);
+    let seconds = 0;
+    let highest = 0;
+    runUntil(core, () => {
+      const trick = core.monster().trick;
+      const lift = trick?.trick === "dodge" ? trick.lift : 0;
+      highest = Math.max(highest, lift);
+      if (seconds > 0 && lift === 0) return true;
+      seconds += 1 / 60;
+      return false;
+    });
+    const m = core.monster();
+
+    expect(seconds).toBeGreaterThan(0.15);
+    expect(seconds).toBeLessThan(0.5);
+    expect(highest).toBeGreaterThan(m.height * 0.2);
+    expect(Math.abs(m.x - finger.x)).toBeGreaterThan(m.width * 0.6);
+    expect(Math.abs(m.y - finger.y)).toBeLessThan(m.height * 0.1);
+  });
+
+  it("a Bouncy Monster never dodges twice in a row", () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const core = dodgyBouncy(seed, true);
+      expect(tapMonster(core)).toBe("boing");
+      // Long enough for another Dodge to come round, if it could.
+      runFor(core, 3);
+
+      expect(tapMonster(core)).toBe("bonk");
+    }
+  });
+
+  it("a Bouncy Monster never dodges a Flick", () => {
+    const core = dodgyBouncy();
+
+    expect(core.flick(swipeAcross(core))).toBe("flick");
+    // And it doesn't hop out of the way of the taps that follow, mid-flight.
+    expect(core.monster().trick).toBeUndefined();
+  });
+
+  it("a fully Dizzy Bouncy Monster doesn't dodge, so the catching tap always works", () => {
+    for (let seed = 1; seed <= 5; seed++) {
+      const core = buildCore(seed, undefined, { temperament: "bouncy", hardMode: true });
+      while (!core.monster().readyToCatch) {
+        runUntil(core, () => !core.monster().stunned && !core.monster().flying);
+        tapMonster(core);
+      }
+      let tricked = false;
+      runFor(core, 20, () => {
+        if (core.monster().trick) tricked = true;
+      });
+
+      expect(tricked).toBe(false);
+      expect(tapMonster(core)).toBe("caught");
+    }
   });
 });
