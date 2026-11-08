@@ -3,6 +3,7 @@ import { BEHAVIORS, TEMPERAMENTS, tighten, type Behavior, type Temperament } fro
 import { NAME_WORDS } from "./nameWords";
 import { BIO_WORDS } from "./bioWords";
 import { MONSTER_SCHEMA_VERSION, type MonsterRecord, type ZooStorage } from "./zooStorage";
+import { createTricks, type TrickView } from "./tricks";
 
 export interface Arena {
   readonly width: number;
@@ -42,6 +43,8 @@ export interface MonsterView {
   readonly sleepy: boolean;
   /** Caught in its bubble. The Catch is over. */
   readonly caught: boolean;
+  /** The Trick it's playing right now, for the renderer to draw, or undefined if none. */
+  readonly trick: TrickView | undefined;
   /**
    * How this Monster's sounds are pitched, as a playback-rate multiplier
    * (1 = as recorded). Chosen once, so the Monster keeps its own voice.
@@ -352,11 +355,42 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
   const halfW = () => width / 2;
   const halfH = () => height / 2;
 
+  const tricks = createTricks(
+    {
+      get x() {
+        return x;
+      },
+      get y() {
+        return y;
+      },
+      get width() {
+        return width;
+      },
+      get height() {
+        return height;
+      },
+      dice,
+      dashOff,
+      shift(dx, dy) {
+        x = Math.min(arena.width - halfW(), Math.max(halfW(), x + dx));
+        y = Math.min(arena.height - halfH(), Math.max(halfH(), y + dy));
+      },
+    },
+    () => ({
+      temperament,
+      hardMode: hardMode(),
+      dizzy,
+      fullDizzy: FULL_DIZZY,
+      runningFree: stunnedLeft === 0 && !flying,
+      sleepy: sleepy(),
+    }),
+  );
+
   function speed() {
     if (stunnedLeft > 0 || caught) return 0;
     if (flying) return FLICK_SPEED;
     const { speed, dashBoost } = behavior();
-    return speed * (1 + dashBoost * (dashLeft / DASH_SECONDS)) * hopping() * sleepiness();
+    return speed * (1 + dashBoost * (dashLeft / DASH_SECONDS)) * hopping() * sleepiness() * tricks.speed();
   }
 
   /** A hopping Monster's speed rises and falls with each hop. Others keep a steady 1. */
@@ -487,9 +521,13 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
       if (!inPlay()) return "none";
       catchSeconds += dt;
       drainDizzy(dt);
+      tricks.tick(dt);
       if (stunnedLeft > 0) {
         stunnedLeft = Math.max(0, stunnedLeft - dt);
-        if (stunnedLeft === 0) dashOff();
+        if (stunnedLeft === 0) {
+          dashOff();
+          tricks.dashedOff();
+        }
         return "none";
       }
       if (flying) return flyTowardsWall(dt);
@@ -520,10 +558,15 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
       readyToCatch: readyToCatch(),
       sleepy: sleepy(),
       caught,
+      trick: tricks.view(),
       voice,
     }),
     bonk(at) {
-      if (!inPlay() || !crossesMonster([at])) return "miss";
+      if (!inPlay()) return "miss";
+      const onMonster = crossesMonster([at]);
+      const fooled = tricks.tap(at, onMonster);
+      if (fooled) return fooled;
+      if (!onMonster) return "miss";
       const early = hitWithoutDizzy();
       if (early) return early;
       dizzy += 1;
@@ -537,6 +580,8 @@ function createRound(dice: Dice, hardMode: () => boolean, napping?: MonsterRecor
       const dy = path[path.length - 1].y - path[0].y;
       const length = Math.hypot(dx, dy);
       if (length === 0) return "miss";
+      const fooled = tricks.flick();
+      if (fooled) return fooled;
       const early = hitWithoutDizzy();
       if (early) return early;
       dizzy = Math.min(FULL_DIZZY, dizzy + FLICK_DIZZY_STEPS);
