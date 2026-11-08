@@ -32,3 +32,5 @@ It still needs a human playtest in Chrome's device toolbar. Check:
 - the arrows and dots are easy to see and use, and don't get in the way of the Monsters;
 - the swipe feels natural and doesn't fire when you meant to tap a Monster;
 - a newly caught Monster arriving in a fresh Habitat is clear to the kid.
+
+**2026-11-07 (human):** Playtested in the browser (with `?placeholders=10`). Everything worked as expected.
