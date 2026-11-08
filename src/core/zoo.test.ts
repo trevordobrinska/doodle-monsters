@@ -102,7 +102,7 @@ describe("the Zoo", () => {
       drawingSize: { width: 400, height: 400 },
       eyes: [{ x: 0.5, y: 0.3 }],
       temperament: "sturdy",
-      bio: "",
+      bio: expect.stringMatching(/one googly eye/),
       mainColor: "purple",
       drawnAt: "2026-11-07T12:00:00.000Z",
       status: "zoo",

@@ -14,6 +14,7 @@ import { listenForGestures } from "./input/gestures";
 import { createSound, type Effect } from "./sound/sound";
 import { createDrawScreen } from "./draw/drawScreen";
 import { createBringToLifeScreen } from "./bringToLife/bringToLifeScreen";
+import { createNameCard } from "./zoo/nameCard";
 import type { FinishedDrawing } from "./draw/drawing";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
@@ -38,6 +39,8 @@ const bringToLifeRoot = document.querySelector<HTMLElement>("#bring-to-life");
 if (!bringToLifeRoot) throw new Error("Missing #bring-to-life");
 const zooRoot = document.querySelector<HTMLElement>("#zoo");
 if (!zooRoot) throw new Error("Missing #zoo");
+const nameCardRoot = document.querySelector<HTMLElement>("#name-card");
+if (!nameCardRoot) throw new Error("Missing #name-card");
 const firstTimeArrow = zooRoot.querySelector<HTMLElement>(".first-time")!;
 const drawButton = zooRoot.querySelector<HTMLButtonElement>(".draw")!;
 
@@ -97,6 +100,13 @@ const bringToLifeScreen = createBringToLifeScreen(bringToLifeRoot, {
   onStart: startCatch,
   onHardModeChange: saveHardMode,
 });
+const nameCard = createNameCard(nameCardRoot, {
+  // The core forgets the Monster in storage at once; it waves and walks off.
+  onGoodbye(id) {
+    if (core.sayGoodbye(id)) core.saved().catch((error) => console.error("Couldn't Say Goodbye", error));
+  },
+});
+
 /** The kid's finished drawing, kept from Bring to life for the Catch. */
 let monsterImage: HTMLCanvasElement | undefined;
 /** Turning the drawing into a PNG to keep takes a moment; ignore "Done" again meanwhile. */
@@ -111,12 +121,18 @@ function showZoo() {
   bringToLifeScreen.hide();
   canvas!.hidden = false;
   habitat.resize();
-  firstTimeArrow.hidden = core.zoo().length > 0;
+  showFirstTimeArrow();
   zooRoot!.hidden = false;
+}
+
+/** The arrow to "Draw a Monster!" shows while the Zoo is empty, as it is again after the last goodbye. */
+function showFirstTimeArrow() {
+  firstTimeArrow.hidden = core.zoo().length > 0;
 }
 
 drawButton.addEventListener("click", () => {
   if (!core.startRound()) return;
+  nameCard.hide();
   zooRoot.hidden = true;
   canvas.hidden = true;
   finger = undefined;
@@ -215,13 +231,14 @@ function noteIfCaught(result: TapResult | FlickResult) {
 }
 
 // The gesture layer tells taps from Flicks. The core decides whether they hit the Monster.
-// The game canvas is hidden while drawing. In the Zoo, a tap on a Monster
-// asks the core to resume it, which only a Napping one will.
+// The game canvas is hidden while drawing. In the Zoo, tapping a Napping
+// Monster resumes its Catch, and tapping any other opens its Name Card.
 listenForGestures(canvas, (clientX, clientY) => (renderer ?? habitat).toArena(clientX, clientY), {
   onTap(at) {
     if (core.phase() === "zoo") {
       const tapped = core.zooMonsterAt(at);
       if (tapped?.napping) resumeNapping(tapped.id, tapped.image);
+      else if (tapped) nameCard.show(tapped);
       return;
     }
     if (!renderer) return;
@@ -261,7 +278,10 @@ function frame(now: number) {
   const dt = last === undefined ? 0 : Math.min((now - last) / 1000, MAX_DT);
   last = now;
   playFor(core.tick(dt));
-  if (core.phase() === "zoo") habitat.draw(dt, finger?.at);
+  if (core.phase() === "zoo") {
+    habitat.draw(dt, finger?.at);
+    showFirstTimeArrow();
+  }
   else renderer?.draw(dt);
   requestAnimationFrame(frame);
 }

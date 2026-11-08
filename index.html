@@ -286,6 +286,118 @@
       @keyframes point {
         to { transform: translateY(18px); }
       }
+      /* Name Card (ticket 11) */
+      #name-card {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(43, 43, 64, 0.45);
+        font-family: sans-serif;
+        color: #2b2b40;
+      }
+      #name-card .card {
+        position: relative;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        max-width: min(900px, 92vw);
+        max-height: 90vh;
+        padding: 24px 28px;
+        box-sizing: border-box;
+        background: #fff8e7;
+        border: 4px solid #2b2b40;
+        border-radius: 28px;
+        box-shadow: 0 8px 0 #2b2b40;
+        animation: card-in 0.25s ease-out;
+      }
+      @keyframes card-in {
+        from { transform: scale(0.8); opacity: 0; }
+      }
+      #name-card .picture {
+        flex: none;
+        width: 280px;
+        height: 280px;
+        border-radius: 20px;
+        background: radial-gradient(circle, #ffffff 0%, #ffeccc 75%);
+      }
+      #name-card .details {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+        max-width: 420px;
+        overflow-y: auto;
+      }
+      #name-card .name {
+        margin: 0 40px 0 0;
+        font-size: 34px;
+        overflow-wrap: anywhere;
+      }
+      #name-card .drawn {
+        font-size: 18px;
+        opacity: 0.7;
+      }
+      #name-card .temperament {
+        align-self: flex-start;
+        padding: 4px 14px;
+        font: bold 20px sans-serif;
+        background: #ffd23f;
+        border-radius: 14px;
+      }
+      #name-card .bio {
+        margin: 6px 0;
+        font-size: 21px;
+        line-height: 1.4;
+      }
+      #name-card button {
+        font: bold 20px sans-serif;
+        color: #2b2b40;
+        border: 3px solid #2b2b40;
+        border-radius: 14px;
+        background: #ffffff;
+        touch-action: manipulation;
+      }
+      #name-card .close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 52px;
+        height: 52px;
+        padding: 0;
+        font-size: 24px;
+      }
+      #name-card .goodbye {
+        position: relative;
+        overflow: hidden;
+        align-self: flex-start;
+        padding: 12px 22px;
+        touch-action: none;
+      }
+      #name-card .goodbye .fill {
+        position: absolute;
+        inset: 0;
+        background: #ffb3c7;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition-property: transform;
+        transition-timing-function: linear;
+      }
+      /* Letting go early snaps it back at once. */
+      #name-card .goodbye:not(.holding) .fill {
+        transition-duration: 0s !important;
+      }
+      #name-card .goodbye.holding .fill {
+        transform: scaleX(1);
+      }
+      #name-card .goodbye .label {
+        position: relative;
+      }
+      #name-card .goodbye-hint {
+        font-size: 15px;
+        opacity: 0.6;
+      }
     </style>
   </head>
   <body>
@@ -299,6 +411,7 @@
       </div>
       <button class="draw">✏️ Draw a Monster!</button>
     </div>
+    <div id="name-card" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

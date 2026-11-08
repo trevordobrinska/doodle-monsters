@@ -1,6 +1,7 @@
 import type { Clock, Dice } from "./deps";
-import { BEHAVIORS, tighten, type Behavior, type Temperament } from "./temperaments";
+import { BEHAVIORS, TEMPERAMENTS, tighten, type Behavior, type Temperament } from "./temperaments";
 import { NAME_WORDS } from "./nameWords";
+import { BIO_WORDS } from "./bioWords";
 import { MONSTER_SCHEMA_VERSION, type MonsterRecord, type ZooStorage } from "./zooStorage";
 
 export interface Arena {
@@ -82,6 +83,8 @@ export interface ZooMonsterView {
   readonly eyes: readonly GooglyEye[];
   /** When its drawing was finished, as an ISO 8601 date and time. */
   readonly drawnAt: string;
+  /** Its short, silly Bio, written once when it was caught. Empty while Napping. */
+  readonly bio: string;
   /** Where it is in the Habitat, which is the same size as the arena. */
   readonly x: number;
   readonly y: number;
@@ -93,6 +96,10 @@ export interface ZooMonsterView {
   readonly vy: number;
   /** Its Catch was left unfinished: it sleeps (💤) until the kid taps it to resume. */
   readonly napping: boolean;
+  /** The kid Said Goodbye: it waves, then walks out of the Habitat, and is gone. */
+  readonly leaving: boolean;
+  /** Saying Goodbye, and still waving before it walks away. */
+  readonly waving: boolean;
 }
 
 /** What the drawing screen tells the core about a finished drawing. */
@@ -138,6 +145,12 @@ export interface GameCore {
   zooMonsterAt(at: Point): ZooMonsterView | undefined;
   /** The kid tapped a Napping Monster: back to its Catch. Returns whether it resumed. */
   resume(id: string): boolean;
+  /**
+   * Say Goodbye, from a Monster's Name Card: the only way a Monster ever
+   * leaves the Zoo. It's gone from storage at once, then waves and walks
+   * out of the Habitat. Returns whether it's going.
+   */
+  sayGoodbye(id: string): boolean;
   /** "Draw a Monster!": starts a new Round from the Zoo. Returns whether it started. */
   startRound(): boolean;
   /** After the Catch, the caught Monster's kid goes back to the Zoo. Returns whether it went. */
@@ -528,6 +541,17 @@ const HABITAT_TURN_SECONDS = { min: 2, max: 5 };
 /** ...turning by up to this many degrees either way. */
 const HABITAT_MAX_TURN = 70;
 
+/** A Monster Saying Goodbye waves for this many seconds... */
+const GOODBYE_WAVE_SECONDS = 1.5;
+/** ...then walks out of the nearer side of the Habitat at this speed, in pixels per second. */
+const GOODBYE_WALK_SPEED = 160;
+
+/** A Monster Saying Goodbye: seconds of waving left, then which way it walks off. */
+interface Goodbye {
+  waveLeft: number;
+  dirX: number;
+}
+
 /** A Monster in the Zoo: its saved record plus where it is in the Habitat. */
 interface HabitatMonster {
   record: MonsterRecord;
@@ -540,6 +564,8 @@ interface HabitatMonster {
   dirY: number;
   speed: number;
   turnIn: number;
+  /** Set once the kid Says Goodbye. */
+  goodbye?: Goodbye;
 }
 
 export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore {
@@ -557,6 +583,8 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
   let catching: MonsterRecord | undefined;
   let habitat: HabitatMonster[] = [];
   let saving: Promise<void> = Promise.resolve();
+  /** Monsters the kid Said Goodbye to, so loading the Zoo again never brings one back. */
+  const goneIds = new Set<string>();
 
   const randomSign = () => (dice.roll() < 0.5 ? -1 : 1);
   const turnDelay = () => HABITAT_TURN_SECONDS.min + dice.roll() * (HABITAT_TURN_SECONDS.max - HABITAT_TURN_SECONDS.min);
@@ -579,10 +607,11 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     };
   }
 
-  function save(record: MonsterRecord) {
-    // One save after another, and one failing doesn't stop the next.
-    saving = saving.catch(() => {}).then(() => storage.save(record));
+  /** One change to storage after another, and one failing doesn't stop the next. */
+  function store(change: () => Promise<void>) {
+    saving = saving.catch(() => {}).then(change);
   }
+  const save = (record: MonsterRecord) => store(() => storage.save(record));
 
   /** The Round's Catch just began: its Monster is saved, Napping until it's caught. */
   function saveNapping() {
@@ -607,14 +636,28 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
   /** The Round's Monster was just caught: it moves into the Zoo, for good. */
   function moveIntoZoo() {
     if (!catching) return;
-    const record: MonsterRecord = { ...catching, status: "zoo" };
+    // The Bio is written once, now, and kept with the Monster for good.
+    const record: MonsterRecord = { ...catching, bio: generateBio(dice, catching), status: "zoo" };
     catching = undefined;
     habitat = [...habitat, intoHabitat(record, round.monster())];
     save(record);
   }
 
+  /**
+   * A Zoo Monster saved before Bios were written (ticket 11) gets its Bio
+   * now, saved so it's the same one from then on.
+   */
+  function withBio(record: MonsterRecord): MonsterRecord {
+    if (record.status !== "zoo" || record.bio !== "") return record;
+    const written = { ...record, bio: generateBio(dice, record) };
+    save(written);
+    return written;
+  }
+
   function view(h: HabitatMonster): ZooMonsterView {
     const napping = h.record.status === "napping";
+    const waving = (h.goodbye?.waveLeft ?? 0) > 0;
+    const still = napping || waving;
     return {
       id: h.record.id,
       name: h.record.name,
@@ -623,20 +666,27 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       mainColor: h.record.mainColor,
       eyes: h.eyes,
       drawnAt: h.record.drawnAt,
+      bio: h.record.bio,
       x: h.x,
       y: h.y,
       width: h.width,
       height: h.height,
-      // Napping Monsters sleep where they are.
-      vx: napping ? 0 : h.dirX * h.speed,
-      vy: napping ? 0 : h.dirY * h.speed,
+      // Napping Monsters sleep where they are, and Say Goodbye starts with a wave.
+      vx: still ? 0 : h.dirX * h.speed,
+      vy: still ? 0 : h.dirY * h.speed,
       napping,
+      leaving: h.goodbye !== undefined,
+      waving,
     };
   }
 
   function wander(dt: number) {
     for (const h of habitat) {
       if (h.record.status === "napping") continue;
+      if (h.goodbye) {
+        walkAway(h, h.goodbye, dt);
+        continue;
+      }
       h.turnIn -= dt;
       if (h.turnIn <= 0) {
         h.turnIn += turnDelay();
@@ -651,6 +701,23 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     }
   }
 
+  /** Waves, then walks straight out of the Habitat, past the wall. */
+  function walkAway(h: HabitatMonster, goodbye: Goodbye, dt: number) {
+    if (goodbye.waveLeft > 0) {
+      goodbye.waveLeft = Math.max(0, goodbye.waveLeft - dt);
+      if (goodbye.waveLeft === 0) {
+        h.dirX = goodbye.dirX;
+        h.dirY = 0;
+        h.speed = GOODBYE_WALK_SPEED;
+      }
+      return;
+    }
+    h.x += h.dirX * h.speed * dt;
+  }
+
+  /** Whether a Monster walking away has gone right out of sight. */
+  const outOfSight = (h: HabitatMonster) => h.x + h.width / 2 <= 0 || h.x - h.width / 2 >= arena.width;
+
   return {
     arena,
     phase: () => (inZoo ? "zoo" : round.phase()),
@@ -659,14 +726,15 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       // Skip Monsters already here, and the one being caught right now.
       const here = new Set([...habitat.map((h) => h.record.id), catching?.id]);
       const arriving = records
-        .filter((r) => !here.has(r.id))
+        .filter((r) => !here.has(r.id) && !goneIds.has(r.id))
+        .map(withBio)
         .map((r) => intoHabitat(r, { x: dice.roll() * arena.width, y: dice.roll() * arena.height }));
       habitat = [...habitat, ...arriving];
     },
     zoo: () => habitat.map(view),
     zooMonsterAt(at) {
       // Nearer the bottom is drawn in front, so it's the one a tap lands on.
-      const hit = habitat.filter((h) => onOval(at, h, h.width, h.height)).sort((a, b) => b.y - a.y)[0];
+      const hit = habitat.filter((h) => !h.goodbye && onOval(at, h, h.width, h.height)).sort((a, b) => b.y - a.y)[0];
       return hit && view(hit);
     },
     resume(id) {
@@ -677,6 +745,14 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
       drawing = undefined;
       catching = h.record;
       inZoo = false;
+      return true;
+    },
+    sayGoodbye(id) {
+      const h = habitat.find((h) => h.record.id === id);
+      if (!inZoo || !h || h.goodbye) return false;
+      h.goodbye = { waveLeft: GOODBYE_WAVE_SECONDS, dirX: h.x < arena.width / 2 ? -1 : 1 };
+      goneIds.add(id);
+      store(() => storage.remove(id));
       return true;
     },
     saved: () => saving,
@@ -731,6 +807,7 @@ export function createGameCore({ clock, dice, storage }: GameCoreDeps): GameCore
     tick(dt) {
       if (inZoo) {
         wander(dt);
+        habitat = habitat.filter((h) => !(h.goodbye && outOfSight(h)));
         return "none";
       }
       return round.tick(dt);
@@ -765,10 +842,32 @@ function newId(dice: Dice): string {
   return id;
 }
 
+/** One word from a list, chosen with the dice. */
+function pickWord(dice: Dice, words: readonly string[]): string {
+  return words[Math.floor(dice.roll() * words.length)];
+}
+
 /** Fills a name template's {blanks} from the word lists, choosing with the dice. */
 function generateName(dice: Dice): string {
-  const pick = (words: readonly string[]) => words[Math.floor(dice.roll() * words.length)];
+  const pick = (words: readonly string[]) => pickWord(dice, words);
   return pick(NAME_WORDS.templates).replace(/\{(\w+)\}/g, (_, list: keyof typeof NAME_WORDS) => pick(NAME_WORDS[list]));
+}
+
+/**
+ * Writes a Bio from real facts about the Monster: its name, how many Googly
+ * Eyes it has, its main color and its Temperament. The rest of the words are
+ * chosen with the dice.
+ */
+function generateBio(dice: Dice, m: Pick<MonsterRecord, "name" | "eyes" | "mainColor" | "temperament">): string {
+  const pick = (words: readonly string[]) => pickWord(dice, words);
+  const facts: Record<string, string> = {
+    name: m.name,
+    eyes: BIO_WORDS.eyeCounts[Math.min(m.eyes.length, BIO_WORDS.eyeCounts.length) - 1],
+    color: m.mainColor,
+    temperament: TEMPERAMENTS.find((t) => t.id === m.temperament)!.word.toLowerCase(),
+  };
+  const lists: Record<string, readonly string[]> = { ...BIO_WORDS, habit: BIO_WORDS.habit[m.temperament] };
+  return pick(BIO_WORDS.templates).replace(/\{(\w+)\}/g, (_, blank: string) => facts[blank] ?? pick(lists[blank]));
 }
 
 /** Keeps a point relative to the drawing's box inside the box. */

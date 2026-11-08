@@ -6,7 +6,8 @@ import { createLetterbox } from "./letterbox";
  * Draws the Zoo's Habitat from the core's state: every Monster wandering
  * and hopping about, Googly Eyes jiggling, and watching the kid's finger
  * while they touch the screen. Napping Monsters doze where they are, with a
- * 💤. Holds no game rules.
+ * 💤. A Monster Saying Goodbye rocks and waves 👋, then hops away out of
+ * the Habitat. Holds no game rules.
  */
 export interface HabitatRenderer {
   resize(): void;
@@ -33,6 +34,11 @@ const BREATH_SECONDS = 3;
 const BREATH_SWELL = 0.04;
 /** ...while its 💤 badge bobs up and down this often. */
 const ZZZ_SECONDS = 2.4;
+/** A waving Monster rocks side to side this often, by up to this many radians... */
+const WAVE_SECONDS = 0.5;
+const WAVE_ROCK = 0.12;
+/** ...and its 👋 swings back and forth this far, in radians. */
+const HAND_SWING = 0.5;
 /** Seconds a Monster takes to pop into the Habitat. */
 const POP_IN_SECONDS = 0.5;
 /** Tufts of grass dotted about, so the Habitat isn't bare: scattered evenly-ish, the same every time. */
@@ -48,6 +54,8 @@ interface Seen {
   shownFor: number;
   /** Seconds since it started Napping, for its breathing and 💤. */
   dozing: number;
+  /** Seconds since it started waving goodbye. */
+  waved: number;
 }
 
 export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore): HabitatRenderer {
@@ -61,7 +69,7 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
   function seenFor(m: ZooMonsterView): Seen {
     let s = seen.get(m.id);
     if (!s) {
-      s = { pupils: m.eyes.map((_, i) => createPupil(springinessFor(i))), hopPhase: Math.random(), shownFor: 0, dozing: 0 };
+      s = { pupils: m.eyes.map((_, i) => createPupil(springinessFor(i))), hopPhase: Math.random(), shownFor: 0, dozing: 0, waved: 0 };
       seen.set(m.id, s);
       const fresh = s;
       // Decoding takes a moment; the Monster pops in once it's ready.
@@ -131,8 +139,16 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
     ctx.ellipse(m.x, m.y + m.height / 2, (m.width / 2) * 0.7 * pop, 8 * pop, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Waving goodbye: rocks from foot to foot.
+    let rock = 0;
+    if (m.waving) {
+      s.waved += dt;
+      rock = Math.sin((s.waved * Math.PI * 2) / WAVE_SECONDS) * WAVE_ROCK;
+    }
+
     ctx.save();
     ctx.translate(at.x, at.y + m.height / 2);
+    ctx.rotate(rock);
     ctx.scale(pop * (1 + squash), pop * (1 - squash));
     ctx.translate(0, -m.height / 2);
     ctx.drawImage(s.image, -m.width / 2, -m.height / 2, m.width, m.height);
@@ -147,6 +163,23 @@ export function createHabitatRenderer(canvas: HTMLCanvasElement, core: GameCore)
     });
     ctx.restore();
     if (m.napping) drawZzz(m, s.dozing, pop);
+    if (m.waving) drawWave(m, s.waved);
+  }
+
+  /** A big 👋 by the Monster's top corner, waving. It's on the side towards the middle, so it's never off the edge. */
+  function drawWave(m: ZooMonsterView, waved: number) {
+    const side = m.x < core.arena.width / 2 ? 1 : -1;
+    const size = 48;
+    ctx.save();
+    ctx.translate(m.x + side * m.width * 0.55, Math.max(size, m.y - m.height * 0.35));
+    ctx.rotate(Math.sin((waved * Math.PI * 2) / WAVE_SECONDS) * HAND_SWING);
+    // Emoji take the fill's see-through-ness, so make it solid.
+    ctx.fillStyle = "#000000";
+    ctx.font = `${size}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("👋", 0, size / 2);
+    ctx.restore();
   }
 
   /** The 💤 badge: a white bubble by the Monster's top corner, bobbing gently so it catches the eye. */
