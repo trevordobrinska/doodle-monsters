@@ -40,15 +40,15 @@ export interface TrickState {
   readonly temperament: Temperament | undefined;
   readonly hardMode: boolean;
   readonly dizzy: number;
-  /** Not Stunned or flung: a new Trick can only start then. */
+  /** Not Stunned or flung: a Trick played every so often can only start then. */
   readonly runningFree: boolean;
   readonly sleepy: boolean;
 }
 
 /**
  * Plays the Monster's Trick during its Catch: when it starts (the shared
- * ramp, hard mode and the sleepy stop), and passing the Catch's taps, Flicks
- * and dashes on to it.
+ * ramp, hard mode and the sleepy stop), and passing the Catch's taps and Flicks
+ * on to it. A Trick played on dashes starts as the Monster dashes off.
  */
 export interface Tricks {
   tick(dt: number): void;
@@ -56,6 +56,7 @@ export interface Tricks {
   tap(at: Point, onMonster: boolean): Fooled;
   /** A Flick that crossed the Monster, before it's judged: "boing" if the Trick shrugged it off. */
   flick(): Fooled;
+  /** The Monster just dashed off after being Stunned. */
   dashedOff(): void;
   /** How fast the Monster moves, as a share of its usual speed. */
   speed(): number;
