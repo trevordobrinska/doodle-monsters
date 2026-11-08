@@ -82,7 +82,8 @@ function playFor(result: TapResult | FlickResult | TickResult) {
 }
 
 // One core for as long as the app is open: it keeps the Zoo, and runs each Round in turn.
-const core: GameCore = createGameCore({ clock: systemClock, dice: randomDice, storage: indexedDbZooStorage() });
+const storage = indexedDbZooStorage();
+const core: GameCore = createGameCore({ clock: systemClock, dice: randomDice, storage });
 core.setHardMode(savedHardMode());
 const habitat = createHabitatRenderer(canvas, core);
 habitat.resize();
@@ -240,9 +241,21 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pagehide", leave);
 
+/**
+ * Dev only: `?placeholders=10` fills the Zoo with 10 placeholder Monsters
+ * for playtesting (and `?placeholders=0` clears them). Left out of the build.
+ */
+async function seedForDev() {
+  const wanted = new URLSearchParams(location.search).get("placeholders");
+  if (!import.meta.env.DEV || wanted === null) return;
+  const { seedPlaceholders } = await import("./dev/placeholders");
+  await seedPlaceholders(storage, Math.max(0, Math.floor(Number(wanted)) || 0));
+}
+
 // Bring back the saved Zoo, then open straight into it.
-core
-  .loadZoo()
+seedForDev()
+  .catch((error) => console.error("Couldn't add placeholder Monsters", error))
+  .then(() => core.loadZoo())
   .catch((error) => console.error("Couldn't load the Zoo", error))
   .finally(showZoo);
 
