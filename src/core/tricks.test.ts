@@ -316,8 +316,8 @@ describe("Shell", () => {
 
 describe("Doze", () => {
   /** Keeps a Sleepy Monster nearly Dizzy until it's dozing, and not Stunned. */
-  function dozingSleepy(): GameCore {
-    const core = catchWith({ temperament: "sleepy" });
+  function dozingSleepy(seed = 1, hardMode = false): GameCore {
+    const core = buildCore(seed, undefined, { temperament: "sleepy", hardMode });
     runUntil(core, () => {
       const m = core.monster();
       if (m.trick?.trick === "doze") return !m.stunned;
@@ -362,6 +362,18 @@ describe("Doze", () => {
 
     expect(tapMonster(core)).toBe("bonk");
     expect(core.monster().dizzy).toBe(before + 1);
+  });
+
+  it("after a Doze, the next landing tap is a Bonk even if the ramp would fire again", () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const core = dozingSleepy(seed, true);
+      expect(tapMonster(core)).toBe("boing");
+      // Long enough for another Doze to come round, if it could.
+      runFor(core, 8);
+
+      expect(core.monster().trick).toBeUndefined();
+      expect(tapMonster(core)).toBe("bonk");
+    }
   });
 
   it("a Flick on a dozing Monster only wakes it", () => {
