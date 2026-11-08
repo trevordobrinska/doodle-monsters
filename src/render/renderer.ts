@@ -71,6 +71,9 @@ const halfH = (m: MonsterView) => m.height / 2;
 const hopStrength = (m: MonsterView) => Math.min(1, Math.hypot(m.vx, m.vy) / HOP_SPEED);
 
 
+/** How visible the Monster is drawn, Googly Eyes and all: faint while it Fades. */
+const opacity = (m: MonsterView) => (m.trick?.trick === "fade" ? m.trick.opacity : 1);
+
 /** Spiral eyes: fully Dizzy, and still dizzy inside the bubble. */
 const hasSpiralEyes = (m: MonsterView) => m.readyToCatch || m.caught;
 
@@ -282,6 +285,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
     const heading = Math.atan2(m.vy, m.vx);
 
     ctx.save();
+    ctx.globalAlpha = opacity(m);
     const at = drawnAt(m);
     ctx.translate(at.x, at.y);
     if (stretch > 0.01) {
