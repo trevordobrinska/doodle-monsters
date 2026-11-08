@@ -3,10 +3,12 @@
  * Each one also has its own behavior during the Catch.
  */
 export const TEMPERAMENTS = [
+  // Shy was called Sturdy at first. Kids only see the new word; the stored
+  // value stays "sturdy" so Monsters already saved keep loading unchanged.
   { id: "speedy", word: "Speedy", icon: "⚡" },
   { id: "sneaky", word: "Sneaky", icon: "🤫" },
   { id: "bouncy", word: "Bouncy", icon: "🦘" },
-  { id: "sturdy", word: "Sturdy", icon: "🪨" },
+  { id: "sturdy", word: "Shy", icon: "🙈" },
   { id: "sleepy", word: "Sleepy", icon: "😴" },
 ] as const;
 
@@ -34,7 +36,7 @@ export interface Behavior {
 /**
  * Each Temperament's behavior in normal mode. Starting points to tune by
  * playtest: normal mode should take a 7-year-old about 30–60 s to Catch.
- * Speedy is fast with a big dash; Sneaky zigzags; Bouncy hops; Sturdy shakes
+ * Speedy is fast with a big dash; Sneaky zigzags; Bouncy hops; Shy shakes
  * off Bonks and Dizzy quickly but moves slowly; Sleepy is the gentlest.
  */
 export const BEHAVIORS: Record<Temperament, Behavior> = {
