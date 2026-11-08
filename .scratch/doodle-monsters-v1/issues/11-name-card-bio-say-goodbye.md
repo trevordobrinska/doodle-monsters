@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 (Zoo).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] Tapping a Zoo Monster opens its Name Card; it can be closed back to the Habitat
 - [x] The Name Card shows name, large picture, date drawn, Temperament and Bio
@@ -30,3 +30,5 @@ It still needs a human playtest in Chrome's device toolbar. Check:
 - the Bios read well and are silly enough (the word lists are meant for the family to grow);
 - the hold time feels right: not too long for a 7-year-old, long enough not to happen by accident;
 - the wave and walk-off reads as a gentle goodbye.
+
+**2026-11-07 (human):** Playtested in the browser. Adorable; it all looks great.
