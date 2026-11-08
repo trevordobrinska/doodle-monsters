@@ -1,5 +1,6 @@
 import type { Point } from "../gameCore";
 import type { Temperament } from "../temperaments";
+import { AFTER_IMAGE } from "./afterImage";
 import { FADE } from "./fade";
 import type { Trick, TrickBody, TrickPlay, TrickView } from "./trick";
 
@@ -12,6 +13,7 @@ export type { TrickBody, TrickView } from "./trick";
  */
 const TRICKS: Partial<Record<Temperament, Trick>> = {
   sneaky: FADE,
+  speedy: AFTER_IMAGE,
 };
 
 /**

@@ -77,7 +77,7 @@ describe("Tricks", () => {
   });
 
   it("Monsters with other Temperaments play no Trick yet", () => {
-    for (const temperament of ["speedy", "bouncy", "sturdy", "sleepy"] as const) {
+    for (const temperament of ["bouncy", "sturdy", "sleepy"] as const) {
       expect(trickTimeAt(catchWith({ temperament }), 5, 100)).toBe(0);
     }
   });
@@ -136,5 +136,116 @@ describe("Fade", () => {
     runUntil(core, () => core.monster().trick !== undefined && core.monster().trick!.opacity < 0.5);
 
     expect(core.flick(swipeAcross(core))).toBe("flick");
+  });
+});
+
+describe("After-image", () => {
+  /** The fake copy a Speedy Monster has left behind, if any. */
+  function fakeOf(core: GameCore) {
+    const trick = core.monster().trick;
+    return trick?.trick === "afterImage" ? trick : undefined;
+  }
+
+  /**
+   * Bonks a Speedy Monster up to `dizzy`, then keeps Bonking it whenever
+   * it's free until it leaves an after-image as it dashes off. The default
+   * leaves room for 2 more Bonks before it's fully Dizzy.
+   */
+  function speedyWithAfterImage(dizzy = 4): GameCore {
+    const core = catchWith({ temperament: "speedy" });
+    runUntil(core, () => {
+      if (fakeOf(core)) return true;
+      const m = core.monster();
+      if (!m.stunned && m.dizzy < dizzy) tapMonster(core);
+      return false;
+    });
+    return core;
+  }
+
+  /** Waits until the real Monster has run clear of its after-image. */
+  function clearOfFake(core: GameCore) {
+    runUntil(core, () => {
+      const fake = fakeOf(core)!;
+      const m = core.monster();
+      return Math.hypot(m.x - fake.x, m.y - fake.y) > m.width * 1.5;
+    });
+  }
+
+  it("a tap on the after-image goes boing", () => {
+    const core = speedyWithAfterImage();
+    clearOfFake(core);
+    const fake = fakeOf(core)!;
+    const before = core.monster().dizzy;
+
+    expect(core.bonk({ x: fake.x, y: fake.y })).toBe("boing");
+    expect(core.monster().dizzy).toBe(before);
+    expect(fakeOf(core)).toBeUndefined();
+  });
+
+  it("a tap on the real Monster still Bonks while there's an after-image", () => {
+    const core = speedyWithAfterImage();
+    clearOfFake(core);
+    const before = core.monster().dizzy;
+
+    expect(tapMonster(core)).toBe("bonk");
+    expect(core.monster().dizzy).toBe(before + 1);
+  });
+
+  it("a tap where the after-image and the real Monster overlap Bonks the real one", () => {
+    const core = speedyWithAfterImage();
+    const fake = fakeOf(core)!;
+    const before = core.monster().dizzy;
+
+    expect(core.bonk({ x: fake.x, y: fake.y })).toBe("bonk");
+    expect(core.monster().dizzy).toBe(before + 1);
+  });
+
+  it("the after-image appears where the Monster was, stays still for about a second, then fades away", () => {
+    const core = speedyWithAfterImage();
+    const first = fakeOf(core)!;
+    const m = core.monster();
+    expect(Math.hypot(first.x - m.x, first.y - m.y)).toBeLessThan(m.width / 2);
+
+    let seconds = 0;
+    let lastOpacity = 1;
+    runUntil(core, () => {
+      const fake = fakeOf(core);
+      if (!fake) return true;
+      expect(fake.x).toBe(first.x);
+      expect(fake.y).toBe(first.y);
+      seconds += 1 / 60;
+      lastOpacity = fake.opacity;
+      return false;
+    });
+
+    expect(seconds).toBeGreaterThan(0.7);
+    expect(seconds).toBeLessThan(1.6);
+    expect(lastOpacity).toBeLessThan(0.3);
+  });
+
+  it("there's only one after-image at a time", () => {
+    const core = speedyWithAfterImage();
+    const first = fakeOf(core)!;
+    // Bonk the real one again, so it dashes off again while the fake is still there.
+    tapMonster(core);
+    runUntil(core, () => !core.monster().stunned);
+    core.tick(1 / 60);
+
+    expect(fakeOf(core)).toMatchObject({ x: first.x, y: first.y });
+  });
+
+  it("a fully Dizzy Monster leaves no after-images, so the catching tap always works", () => {
+    const core = speedyWithAfterImage(5);
+    clearOfFake(core);
+    // The Bonk that makes it fully Dizzy, while its after-image is still there.
+    expect(tapMonster(core)).toBe("bonk");
+    expect(core.monster().readyToCatch).toBe(true);
+    let fakeWhileFullyDizzy = false;
+    runFor(core, 30, () => {
+      if (fakeOf(core)) fakeWhileFullyDizzy = true;
+    });
+
+    expect(fakeWhileFullyDizzy).toBe(false);
+    expect(tapMonster(core)).toBe("caught");
   });
 });

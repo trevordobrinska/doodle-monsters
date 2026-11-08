@@ -1,5 +1,6 @@
 import type { FlickResult, GameCore, MonsterView, Point, TapResult } from "../core/gameCore";
 import { createPupil, drawGooglyEye, drawSpiral, eyeRadius, springinessFor, type Pupil } from "./googlyEyes";
+import type { AfterImageView } from "../core/tricks/afterImage";
 import { createLetterbox } from "./letterbox";
 
 /**
@@ -226,6 +227,7 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
 
     const m = core.monster();
     for (const s of swooshes) drawSwoosh(s);
+    if (m.trick?.trick === "afterImage") drawAfterImage(m, m.trick);
     drawMonster(m);
     if (m.stunned) drawOrbitingStars(m);
     if (m.caught) drawBubble(m);
@@ -329,6 +331,19 @@ export function createRenderer(canvas: HTMLCanvasElement, core: GameCore, image:
       ctx.fillText("z", m.x + halfW(m) * 0.8 + zz * 20, m.y - halfH(m) - zz * 40);
       ctx.globalAlpha = 1;
     }
+  }
+
+  /** Speedy's fake copy: looks just like the Monster, Googly Eyes and all, standing still. */
+  function drawAfterImage(m: MonsterView, fake: AfterImageView) {
+    ctx.save();
+    ctx.globalAlpha = fake.opacity;
+    ctx.translate(fake.x, fake.y);
+    ctx.drawImage(image, -halfW(m), -halfH(m), m.width, m.height);
+    const r = eyeRadius(m.width, m.height);
+    for (const eye of m.eyes) {
+      drawGooglyEye(ctx, (eye.x - 0.5) * m.width, (eye.y - 0.5) * m.height, r, { pupil: { x: 0, y: 0 } });
+    }
+    ctx.restore();
   }
 
   function drawSwoosh(s: Swoosh) {
