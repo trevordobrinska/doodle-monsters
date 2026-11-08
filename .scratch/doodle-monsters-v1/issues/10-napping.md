@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 (Zoo).
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] Leaving mid-Catch saves the Monster as Napping (drawing, Googly Eyes, Temperament and name kept)
 - [x] A Napping Monster shows in the Zoo with a 💤
@@ -29,3 +29,5 @@ Known issues:
 It still needs a human playtest in Chrome's device toolbar. Check:
 - the 💤 Monster reads as "asleep, tap me" to the 7-year-old;
 - switching tabs mid-Catch and coming back to the Zoo (not the Catch) feels right.
+
+**2026-11-07 (human):** Playtested in the browser. Works great.
