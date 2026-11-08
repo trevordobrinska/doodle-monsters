@@ -28,3 +28,5 @@ Remaining human steps (on the Fire HD 8):
 4. Come back after closing the app, after a reboot and after a few days: card 2 should list the earlier visits.
 
 What to expect: on a first visit, card 2 is yellow ("come back later"). Card 3 is likely red ("Not granted"): the page asks for persistent storage on every load, and browsers often refuse until the site is installed or used a lot. That's a real result to record, not a broken page. When Night 1 is over, remove `night1/`, `src/night1/`, `public/night1/` and the `night1` input in `vite.config.ts`.
+
+**2026-11-08 (agent):** Human step 1 done. `master` is level with `origin/master`. The Pages deploy for the Night 1 commit (run 42392269434) and every one after it passed. The live page at https://trevordobrinska.github.io/doodle-monsters/night1/ returns 200 with the right title. Its manifest, `sw.js` and both icons also return 200. Next is step 2: approve the URL in the Amazon Kids Parent Dashboard for both profiles.
