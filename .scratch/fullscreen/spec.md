@@ -68,3 +68,4 @@ The Arcade's house button (suite rule 5) answers the second: it gives the kids a
 
 - `issues/01-fullscreen-on-tap.md`: the module, the listener, the ADR 0002 update, and deleting the probe.
 - `issues/02-tablet-check.md`: for the builder, blocked by 01 and by Arcade ticket 02 (the house button).
+- `issues/03-system-bars-jump.md`: found on the tablet, undecided. Every touch in fullscreen shows the tablet's bars and the game jumps.
