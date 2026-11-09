@@ -17,7 +17,7 @@ import { createSound, type Effect } from "./sound/sound";
 import { createDrawScreen } from "./draw/drawScreen";
 import { createBringToLifeScreen } from "./bringToLife/bringToLifeScreen";
 import { createNameCard } from "./zoo/nameCard";
-import type { FinishedDrawing } from "./draw/drawing";
+import { SURFACE, type FinishedDrawing } from "./draw/drawing";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
 // was hidden) the game just resumes instead of leaping ahead.
@@ -32,6 +32,13 @@ const OFF_TO_ZOO_AFTER_MS = 3500;
 // so tests can swap in fake ones.
 const systemClock: Clock = { now: () => Date.now() };
 const randomDice: Dice = { roll: () => Math.random() };
+
+const appRoot = document.querySelector<HTMLElement>("#app");
+if (!appRoot) throw new Error("Missing #app");
+// Before anything measures itself: the first frame is already turned right, and
+// this resize listener runs before the screens' own, so they measure the new frame.
+placeAppRoot();
+window.addEventListener("resize", placeAppRoot);
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");
@@ -267,6 +274,16 @@ window.addEventListener("resize", () => {
   habitat.resize();
   placeZooOverlay();
 });
+
+/**
+ * Landscape only (ADR 0002): every screen sits in one app root, sized to the
+ * screen fit's frame and, when the window is tall, turned a quarter by CSS so
+ * it fills the long side. Only re-lays out: no game state is touched.
+ */
+function placeAppRoot() {
+  const { frame, transform } = fitScreen(windowSize(), SURFACE);
+  Object.assign(appRoot!.style, { width: `${frame.width}px`, height: `${frame.height}px`, transform });
+}
 
 /**
  * The zoo overlay sits on the Habitat's rectangle, not the window, so the Draw
