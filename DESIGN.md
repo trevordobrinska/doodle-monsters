@@ -23,7 +23,7 @@ There's no faithful way to emulate a Fire tablet in a Kids profile, so the table
 Throwaway page → GitHub Pages → approve in Parent Dashboard → check on an HD 8 in a kid's profile:
 Run 2026-11-08 on both tablets; full results in ticket 13.
 - [x] Page loads in the Kids profile
-- [ ] Add-to-home-screen works and opens fullscreen. **No:** a Kids profile can't add to the home screen (found in the Arcade's first tablet session)
+- [x] Add-to-home-screen works and opens fullscreen. A site on the Parent Dashboard's allowed list shows up as an icon in the kid's **My Stuff** folder on the home screen and opens fullscreen (no address bar or browser controls). There's no manual add-to-home-screen step
 - [ ] Saved data survives closing the app, rebooting and a few days. Survives reopening (6 visits kept); reboot and few-days recheck still to do. Persistent storage is **not granted**
 - [x] The two kid profiles have separate storage
 - [ ] Downloading a backup file works (or asks for the parent passcode?), and a file picker works for Restore. **No:** nothing downloads (no prompt) and the file picker doesn't open

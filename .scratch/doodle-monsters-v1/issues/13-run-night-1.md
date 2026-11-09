@@ -8,7 +8,7 @@
 
 - [x] The GitHub Pages address is approved in the Amazon Kids Parent Dashboard for both kids
 - [x] The page loads in each Kids profile
-- [ ] Add-to-home-screen works and opens fullscreen (no: not possible in a Kids profile)
+- [x] Add-to-home-screen works and opens fullscreen (allowed sites show up in My Stuff and open fullscreen)
 - [ ] Saved data survives closing the app, rebooting and a few days (recheck after a few days). Reopening: yes. Reboot and few days: still to do
 - [x] The two kid profiles have separate storage
 - [ ] Backup download works (note if it asks for the parent passcode) and the Restore file picker works (no: both blocked)
@@ -31,11 +31,13 @@
 | 6. Restore file picker | Fail: the picker doesn't open | Not tried |
 | 7. Outside server | Pass (200) | Pass (200) |
 | 8. Finger drawing | Smooth | Smooth |
-| 9. Home screen, fullscreen | Not possible: the Arcade's first tablet session found a Kids profile can't add to the home screen | Same |
+| 9. Home screen, fullscreen | Pass (corrected later the same night, see below) | Pass |
 | 10. Remote debugging | Skipped; adb is installed on the PC | Skipped |
 
 What this decides:
 - **Ticket 14:** files are blocked in Kids profiles, so take the "hide the buttons and record the server-backup follow-up" path. Storage isn't persistent, which makes that server backup matter more (V1.5; card 7 shows a Kids profile can reach an outside server).
-- **Ticket 15:** there's no home-screen install from a Kids profile, so the game is reached through the Arcade as an allowed website. The Arcade's ticket 05 is reworking this.
+- **Ticket 15:** see the correction below.
 
 Still open: close the app and reboot tablet B, then reopen card 2 on both tablets after a few days. Both should list earlier visits. Once that's recorded, this ticket can close and the Night 1 page can be removed (see ticket 02).
+
+**2026-11-08, later (builder, recorded by agent):** Correction to card 9. Once a site is on the Parent Dashboard's allowed list, it shows up as an icon in the kid's **My Stuff** folder on the home screen. Tapping it opens fullscreen, with no address bar or browser controls, and it looks good. The earlier "can't add to the home screen" result came from not spotting it there. For ticket 15, "install" means adding the site to the allowed list and finding the icon in My Stuff. There's no add-to-home-screen step. (Seen with the Arcade at `trevordobrinska.github.io`. The Arcade's ticket 05 was opened on the old result and should be revisited in an Arcade session.)
