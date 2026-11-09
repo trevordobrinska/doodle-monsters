@@ -33,6 +33,23 @@ const LOOK_NEAR = 60;
 /** Each eye of a face gets a slightly different springiness (0.8–1.2), so they don't jiggle in step. */
 export const springinessFor = (eyeIndex: number) => 0.8 + ((eyeIndex * 0.37) % 0.4);
 
+/** Seconds a newly stuck eye takes to pop on. */
+const POP_SECONDS = 0.25;
+
+/**
+ * How big a newly stuck eye is drawn, 0 → 1 with a little overshoot, given
+ * the seconds since it was stuck on.
+ */
+export function popInScale(secondsSinceStuck: number): number {
+  // A frame's timestamp can be just before the tap that stuck the eye on, so
+  // clamp below as well as above. Floor at zero too, since the curve dips a
+  // hair under zero at the start and the canvas throws on a negative radius.
+  const t = Math.min(1, Math.max(0, secondsSinceStuck / POP_SECONDS));
+  const s = 1.7;
+  const u = t - 1;
+  return Math.max(0, 1 + u * u * ((s + 1) * u + s));
+}
+
 export function eyeRadius(monsterWidth: number, monsterHeight: number): number {
   return EYE_SIZE * Math.max(monsterWidth, monsterHeight);
 }

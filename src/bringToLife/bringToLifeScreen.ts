@@ -1,6 +1,6 @@
 import { MAX_EYES, type GameCore, type GooglyEye, type Point } from "../core/gameCore";
 import { TEMPERAMENTS } from "../core/temperaments";
-import { createPupil, drawGooglyEye, eyeRadius, type Pupil } from "../render/googlyEyes";
+import { createPupil, drawGooglyEye, eyeRadius, popInScale, type Pupil } from "../render/googlyEyes";
 import { ARENA } from "../core/gameCore";
 import { fitScreen, type ScreenFit } from "../core/screenFit";
 import { viewportSize } from "../render/viewport";
@@ -32,8 +32,6 @@ export interface BringToLifeScreen {
 const DRAWING_FILL = 0.78;
 /** Room for the hint across the top of the stage, in CSS pixels. */
 const HINT_ROOM = 64;
-/** Seconds a new eye takes to pop on. */
-const POP_SECONDS = 0.25;
 /** Eyes are grabbed this far outside their edge, for small fingers, as a fraction of their radius. */
 const GRAB_SLACK = 0.4;
 
@@ -271,7 +269,7 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
       // In CSS pixels, which are about the size of arena units, for the same feel.
       pupil.follow(dt, { x: at.x / dpr, y: at.y / dpr });
       const born = bornAt.get(eye.id);
-      const pop = born === undefined ? 1 : popScale(Math.min(1, (now - born) / 1000 / POP_SECONDS));
+      const pop = born === undefined ? 1 : popInScale((now - born) / 1000);
       const off = drag?.eyeId === eye.id && drag.off;
       drawGooglyEye(ctx, at.x, at.y, r * pop * (off ? 0.8 : 1), { pupil: pupil.offset, alpha: off ? 0.4 : 1 });
     }
@@ -319,11 +317,4 @@ function layoutOffset(el: HTMLElement, ancestor: HTMLElement): Point {
     y += at.offsetTop;
   }
   return { x, y };
-}
-
-/** 0 → 1 with a little overshoot, for an eye popping on. */
-function popScale(t: number): number {
-  const s = 1.7;
-  const u = t - 1;
-  return 1 + u * u * ((s + 1) * u + s);
 }
