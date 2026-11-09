@@ -21,14 +21,15 @@ There's no faithful way to emulate a Fire tablet in a Kids profile, so the table
 
 ## Night 1: test on the real tablet
 Throwaway page → GitHub Pages → approve in Parent Dashboard → check on an HD 8 in a kid's profile:
-- [ ] Page loads in the Kids profile
-- [ ] Add-to-home-screen works and opens fullscreen
-- [ ] Saved data survives closing the app, rebooting and a few days
-- [ ] The two kid profiles have separate storage
-- [ ] Downloading a backup file works (or asks for the parent passcode?), and a file picker works for Restore
-- [ ] Finger drawing is smooth
-- [ ] Remote debugging from the PC works (adb + `chrome://inspect`)
-- [ ] (For the V1.5 bio) The page can call an outside server address from the Kids profile
+Run 2026-11-08 on both tablets; full results in ticket 13.
+- [x] Page loads in the Kids profile
+- [ ] Add-to-home-screen works and opens fullscreen. **No:** a Kids profile can't add to the home screen (found in the Arcade's first tablet session)
+- [ ] Saved data survives closing the app, rebooting and a few days. Survives reopening (6 visits kept); reboot and few-days recheck still to do. Persistent storage is **not granted**
+- [x] The two kid profiles have separate storage
+- [ ] Downloading a backup file works (or asks for the parent passcode?), and a file picker works for Restore. **No:** nothing downloads (no prompt) and the file picker doesn't open
+- [x] Finger drawing is smooth
+- [ ] Remote debugging from the PC works (adb + `chrome://inspect`). Skipped for now; adb is installed on the PC
+- [x] (For the V1.5 bio) The page can call an outside server address from the Kids profile
 
 ## The Round
 1. **Open the app:** it goes straight to the kid's Zoo Habitat with a big "Draw a Monster!" button. A Napping Monster shows 💤 and can be tapped to resume. An empty Zoo shows an arrow pointing at the button.
@@ -50,7 +51,7 @@ Throwaway page → GitHub Pages → approve in Parent Dashboard → check on an 
 
 ## Data
 - Each kid's Zoo lives only on their device (IndexedDB is likely). Store each Monster's data so it could sync to a server later.
-- **Backup/Restore:** buttons anyone can use (no parent gate) that save and load a file. This depends on what the Night 1 test shows for Kids profiles. If it's blocked, the backup moves to the server below.
+- **Backup/Restore:** buttons anyone can use (no parent gate) that save and load a file. This depends on what the Night 1 test shows for Kids profiles. If it's blocked, the backup moves to the server below. Night 1 showed it's blocked, so V1 hides the buttons and backup waits for the server.
 
 ## Sound
 Our own synthesised sound effects (made by `scripts/make-sounds.py`), with the pitch changed in code for each Monster. No music in V1. We first planned Kenney.nl CC0 effects, but the synthesised stand-ins playtested well, so they're kept for V1.

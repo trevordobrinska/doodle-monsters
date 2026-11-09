@@ -12,3 +12,7 @@
 - [ ] Restoring a bad or empty file doesn't wipe the existing Zoo
 - [ ] Core/storage-interface tests (in-memory) for "export then import gives the same Zoo"
 - [ ] Checked on a Fire HD 8 in a Kids profile; if blocked, a follow-up note is written in the spec's Further Notes instead
+
+## Comments
+
+**2026-11-08 (agent):** Night 1 (ticket 13) answered the question this ticket was waiting on. In a Kids profile the backup download does nothing and the file picker doesn't open, so take the blocked path: hide Backup and Restore, and write the server-backup follow-up in the spec's Further Notes. Persistent storage was **not granted** on either tablet, so the browser could clear the Zoo. Harden what we can (keep asking for `persist()`) and flag server backup as the real safety net. A Kids profile can reach an outside HTTPS server (Night 1 card 7 returned 200 on both tablets).
