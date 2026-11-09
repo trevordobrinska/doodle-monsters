@@ -38,5 +38,5 @@
 
 - **Correction:** the bar that fullscreen hid is the Kids **web browser's** top bar, the one with the URL box. It isn't the Kids top bar that shows when the Arcade opens from My Stuff. Whether fullscreen also hides that one is still untested.
 - **Getting out:** the system back button exits fullscreen, and the browser bar comes back. So a kid always has a way out, even without the ⌂ button.
-- **Landscape lock:** both button 2 (fullscreen + lock) and button 3 (lock alone) log `LOCK: refused — NotSupportedError: Screen orientation lock is not available on this device.` So there is no landscape lock, even when fullscreen, and the sideways turn from ticket 02 stays.
+- **Landscape lock:** both button 2 (fullscreen + lock) and button 3 (lock alone) log "Screen orientation lock is not available on this device." So there is no landscape lock, even when fullscreen, and the sideways turn from ticket 02 stays.
 - **Still untested:** fullscreen when the page is opened through the Arcade from My Stuff, the way the game is really reached.
