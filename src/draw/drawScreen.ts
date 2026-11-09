@@ -11,8 +11,7 @@ import {
   type FinishedDrawing,
   type Stroke,
 } from "./drawing";
-import { fitScreen, type ScreenFit } from "../core/screenFit";
-import { windowSize } from "../render/letterbox";
+import { createLetterbox } from "../render/letterbox";
 
 /**
  * The full-screen drawing screen: a canvas to draw on with one finger, a
@@ -66,12 +65,8 @@ export function createDrawScreen(root: HTMLElement, options: DrawScreenOptions):
   const committed = document.createElement("canvas");
   let confirmTimer: number | undefined;
 
-  /** Where the surface sits on the screen. Re-fitted on every resize. */
-  let fit: ScreenFit = fitScreen(windowSize(), SURFACE);
-  // Drawing units → canvas pixels, letterboxed like the arena.
-  let scale = 1;
-  let offsetX = 0;
-  let offsetY = 0;
+  /** Where the surface sits on the screen, letterboxed like the arena. Re-fitted on every resize. */
+  const letterbox = createLetterbox(canvas, SURFACE);
 
   for (const c of COLORS) {
     const swatch = document.createElement("button");
@@ -143,21 +138,17 @@ export function createDrawScreen(root: HTMLElement, options: DrawScreenOptions):
   }
 
   function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    fit = fitScreen(windowSize(), SURFACE);
     // The canvas fills the frame (the app root), like the game canvas.
-    canvas.width = committed.width = Math.round(fit.frame.width * dpr);
-    canvas.height = committed.height = Math.round(fit.frame.height * dpr);
-    scale = fit.scale * dpr;
-    offsetX = fit.rect.x * dpr;
-    offsetY = fit.rect.y * dpr;
+    letterbox.resize();
+    committed.width = canvas.width;
+    committed.height = canvas.height;
     repaintCommitted();
   }
 
   function toSurface(event: PointerEvent): Point {
     // Through the screen fit, never the canvas's on-screen rectangle: once the
     // app is turned that's the rotated bounding box.
-    const p = fit.toSurface(event.clientX, event.clientY);
+    const p = letterbox.toArena(event.clientX, event.clientY);
     // Ink can't land outside the surface (in the letterbox margins), where it
     // would count as ink but never show up in the Monster.
     return { x: clamp(p.x, 0, SURFACE.width), y: clamp(p.y, 0, SURFACE.height) };
@@ -169,7 +160,7 @@ export function createDrawScreen(root: HTMLElement, options: DrawScreenOptions):
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.fillStyle = "#e9e4d8"; // outside the drawing surface
     c.fillRect(0, 0, committed.width, committed.height);
-    c.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    letterbox.inArenaUnits(c);
     c.fillStyle = PAPER;
     c.fillRect(0, 0, SURFACE.width, SURFACE.height);
     c.save();
@@ -191,7 +182,7 @@ export function createDrawScreen(root: HTMLElement, options: DrawScreenOptions):
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(committed, 0, 0);
       if (current) {
-        ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+        letterbox.inArenaUnits(ctx);
         ctx.save();
         ctx.beginPath();
         ctx.rect(0, 0, SURFACE.width, SURFACE.height);

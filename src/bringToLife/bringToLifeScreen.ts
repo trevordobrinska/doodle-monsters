@@ -1,9 +1,9 @@
 import { MAX_EYES, type GameCore, type GooglyEye, type Point } from "../core/gameCore";
 import { TEMPERAMENTS } from "../core/temperaments";
 import { createPupil, drawGooglyEye, eyeRadius, type Pupil } from "../render/googlyEyes";
-import { fitScreen } from "../core/screenFit";
-import { windowSize } from "../render/letterbox";
-import { SURFACE } from "../draw/drawing";
+import { ARENA } from "../core/gameCore";
+import { fitScreen, type ScreenFit } from "../core/screenFit";
+import { viewportSize } from "../render/viewport";
 
 /**
  * The Bring to life screen, between drawing and the Catch: the kid sticks
@@ -81,6 +81,10 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
   /** Where the drawing sits on the canvas, in canvas pixels. */
   let box = { x: 0, y: 0, width: 1, height: 1 };
   let drag: Drag | undefined;
+  /** How the app sits on the screen. Re-fitted on every resize. */
+  let fit: ScreenFit = fitScreen(viewportSize(), ARENA);
+  /** Where the canvas's top-left sits in the frame, CSS pixels. Re-measured on every resize. */
+  let canvasAt: Point = { x: 0, y: 0 };
   let frameId: number | undefined;
   let lastFrame: number | undefined;
   // Per-eye visual state, by eye id: its loose pupil, and when it was stuck on (to pop it on).
@@ -154,17 +158,19 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
   }
 
   function resize() {
+    fit = fitScreen(viewportSize(), ARENA);
+    canvasAt = layoutOffset(canvas, root);
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(stage.clientWidth * dpr);
     canvas.height = Math.round(stage.clientHeight * dpr);
     if (!image) return;
     const top = HINT_ROOM * dpr;
-    const fit = Math.min(
+    const imageScale = Math.min(
       (canvas.width * DRAWING_FILL) / image.width,
       ((canvas.height - top) * DRAWING_FILL) / image.height,
     );
-    const width = image.width * fit;
-    const height = image.height * fit;
+    const width = image.width * imageScale;
+    const height = image.height * imageScale;
     box = { x: (canvas.width - width) / 2, y: top + (canvas.height - top - height) / 2, width, height };
   }
 
@@ -172,19 +178,13 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
   /**
    * A pointer → canvas pixels, through the screen fit rather than the canvas's
    * on-screen rectangle (which, once the app is turned, is the rotated
-   * bounding box). The fit gives the point in the frame; layout offsets, which
-   * ignore the turn, say where the canvas sits in it.
+   * bounding box). The fit gives the point in the frame; the canvas's layout
+   * offset, which ignores the turn, says where the canvas sits in it.
    */
   const toCanvas = (event: PointerEvent): Point => {
-    const at = fitScreen(windowSize(), SURFACE).toFrame(event.clientX, event.clientY);
-    let left = 0;
-    let top = 0;
-    for (let el: HTMLElement | null = canvas; el && el !== root; el = el.offsetParent as HTMLElement | null) {
-      left += el.offsetLeft;
-      top += el.offsetTop;
-    }
+    const at = fit.toFrame(event.clientX, event.clientY);
     const pixelsPerCss = canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
-    return { x: (at.x - left) * pixelsPerCss, y: (at.y - top) * pixelsPerCss };
+    return { x: (at.x - canvasAt.x) * pixelsPerCss, y: (at.y - canvasAt.y) * pixelsPerCss };
   };
   /** Canvas pixels → a point relative to the drawing's box, the way the core keeps eyes. */
   const toDrawing = (p: Point): Point => ({ x: (p.x - box.x) / box.width, y: (p.y - box.y) / box.height });
@@ -302,6 +302,23 @@ export function createBringToLifeScreen(root: HTMLElement, options: BringToLifeO
       frameId = undefined;
     },
   };
+}
+
+/**
+ * Where `el`'s top-left sits inside `ancestor`, in untransformed CSS pixels.
+ * Layout offsets ignore CSS transforms, so this holds whichever way the app is
+ * turned (unlike `getBoundingClientRect`, which gives the rotated bounding box).
+ * Chromium has no transform-aware "point from node" API to use instead.
+ * `ancestor` must be positioned, so the offset-parent chain passes through it.
+ */
+function layoutOffset(el: HTMLElement, ancestor: HTMLElement): Point {
+  let x = 0;
+  let y = 0;
+  for (let at: Element | null = el; at instanceof HTMLElement && at !== ancestor; at = at.offsetParent) {
+    x += at.offsetLeft;
+    y += at.offsetTop;
+  }
+  return { x, y };
 }
 
 /** 0 → 1 with a little overshoot, for an eye popping on. */

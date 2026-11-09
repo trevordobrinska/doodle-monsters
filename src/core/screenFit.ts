@@ -57,35 +57,52 @@ export interface ScreenFit {
   toSurface(clientX: number, clientY: number): Point;
 }
 
-/** Fits a surface onto a window. Pure: callers pass the window size in. */
-export function fitScreen(window: Size, surface: Size): ScreenFit {
-  const turned = window.height > window.width;
-  const frame = turned ? { width: window.height, height: window.width } : { width: window.width, height: window.height };
+/**
+ * Fits a surface onto the viewport (the window's size, never turned).
+ * Pure: callers pass the viewport size in.
+ */
+export function fitScreen(viewport: Size, surface: Size): ScreenFit {
+  const turned = viewport.height > viewport.width;
+  const frame = turned
+    ? { width: viewport.height, height: viewport.width }
+    : { width: viewport.width, height: viewport.height };
   const scale = Math.min(frame.width / surface.width, frame.height / surface.height);
   const width = surface.width * scale;
   const height = surface.height * scale;
   const rect = { x: (frame.width - width) / 2, y: (frame.height - height) / 2, width, height };
-  const toFrame = (clientX: number, clientY: number): Point => {
-    if (!turned) return { x: clientX, y: clientY };
-    return TURN_DEGREES === -90
-      ? { x: window.height - clientY, y: clientX }
-      : { x: clientY, y: window.width - clientX };
-  };
-  const transform = !turned
-    ? "none"
-    : TURN_DEGREES === -90
-      ? `translate(0px, ${window.height}px) rotate(-90deg)`
-      : `translate(${window.width}px, 0px) rotate(90deg)`;
+  const turn = turned ? quarterTurn(viewport) : undefined;
+  const toFrame = (clientX: number, clientY: number): Point =>
+    turn ? turn.toFrame(clientX, clientY) : { x: clientX, y: clientY };
   return {
     turned,
     frame,
     rect,
     scale,
-    transform,
+    transform: turn ? turn.transform : "none",
     toFrame,
     toSurface(clientX, clientY) {
       const p = toFrame(clientX, clientY);
       return { x: (p.x - rect.x) / scale, y: (p.y - rect.y) / scale };
     },
+  };
+}
+
+/**
+ * The quarter turn by TURN_DEGREES on a tall viewport, both ways round, from
+ * the one branch so they can't drift apart: the CSS transform that puts the
+ * frame on the viewport, and its undoing for a pointer.
+ */
+function quarterTurn(viewport: Size): { transform: string; toFrame(clientX: number, clientY: number): Point } {
+  if (TURN_DEGREES === -90) {
+    // The frame's top-left lands on the viewport's bottom-left; its x runs up the screen.
+    return {
+      transform: `translate(0px, ${viewport.height}px) rotate(-90deg)`,
+      toFrame: (clientX, clientY) => ({ x: viewport.height - clientY, y: clientX }),
+    };
+  }
+  // The frame's top-left lands on the viewport's top-right; its x runs down the screen.
+  return {
+    transform: `translate(${viewport.width}px, 0px) rotate(90deg)`,
+    toFrame: (clientX, clientY) => ({ x: clientY, y: viewport.width - clientX }),
   };
 }

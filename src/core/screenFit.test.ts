@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fitScreen } from "./screenFit";
+// The Arena is the 1280×800 surface every screen fits.
+import { ARENA as SURFACE } from "./gameCore";
 
-const SURFACE = { width: 1280, height: 800 };
 
 describe("the screen fit", () => {
   it("a 1280×800 window shows the surface 1:1 with no bars", () => {
@@ -111,4 +112,33 @@ describe("the screen fit", () => {
     expect(fit.toFrame(100, 200)).toEqual({ x: 100, y: 200 });
     expect(fit.transform).toBe("none");
   });
+
+  it("when turned, the CSS transform puts each frame corner where the pointer mapping expects it", () => {
+    const fit = fitScreen({ width: 800, height: 1200 }, SURFACE);
+    const { width, height } = fit.frame;
+
+    for (const corner of [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: 0, y: height },
+      { x: width, y: height },
+    ]) {
+      const onScreen = applyCssTransform(fit.transform, corner);
+      const back = fit.toFrame(onScreen.x, onScreen.y);
+      expect(back.x).toBeCloseTo(corner.x);
+      expect(back.y).toBeCloseTo(corner.y);
+    }
+  });
 });
+
+/**
+ * Where a frame point lands on the window under a `translate(Xpx, Ypx) rotate(Ddeg)`
+ * transform with `transform-origin: 0 0`, the way the browser applies it.
+ */
+function applyCssTransform(transform: string, p: { x: number; y: number }) {
+  const match = /^translate\((-?[\d.]+)px, (-?[\d.]+)px\) rotate\((-?[\d.]+)deg\)$/.exec(transform);
+  if (!match) throw new Error(`Unexpected transform: ${transform}`);
+  const [tx, ty, degrees] = match.slice(1).map(Number);
+  const a = (degrees * Math.PI) / 180;
+  return { x: tx + p.x * Math.cos(a) - p.y * Math.sin(a), y: ty + p.x * Math.sin(a) + p.y * Math.cos(a) };
+}

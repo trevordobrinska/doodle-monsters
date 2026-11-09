@@ -1,4 +1,5 @@
 import {
+  ARENA,
   createGameCore,
   type FlickResult,
   type GameCore,
@@ -9,7 +10,7 @@ import {
 import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
 import { createHabitatRenderer } from "./render/habitatRenderer";
-import { windowSize } from "./render/letterbox";
+import { viewportSize } from "./render/viewport";
 import { fitScreen } from "./core/screenFit";
 import { indexedDbZooStorage } from "./storage/indexedDbZooStorage";
 import { listenForGestures } from "./input/gestures";
@@ -17,7 +18,7 @@ import { createSound, type Effect } from "./sound/sound";
 import { createDrawScreen } from "./draw/drawScreen";
 import { createBringToLifeScreen } from "./bringToLife/bringToLifeScreen";
 import { createNameCard } from "./zoo/nameCard";
-import { SURFACE, type FinishedDrawing } from "./draw/drawing";
+import type { FinishedDrawing } from "./draw/drawing";
 
 // Longest step we'll feed the core in one frame. After a stall (e.g. the tab
 // was hidden) the game just resumes instead of leaping ahead.
@@ -281,7 +282,7 @@ window.addEventListener("resize", () => {
  * it fills the long side. Only re-lays out: no game state is touched.
  */
 function placeAppRoot() {
-  const { frame, transform } = fitScreen(windowSize(), SURFACE);
+  const { frame, transform } = fitScreen(viewportSize(), ARENA);
   Object.assign(appRoot!.style, { width: `${frame.width}px`, height: `${frame.height}px`, transform });
 }
 
@@ -291,7 +292,7 @@ function placeAppRoot() {
  * so they can't disagree about where the Habitat is. Buttons keep their pixel sizes.
  */
 function placeZooOverlay() {
-  const { rect } = fitScreen(windowSize(), core.arena);
+  const { rect } = fitScreen(viewportSize(), ARENA);
   Object.assign(zooRoot!.style, {
     left: `${rect.x}px`,
     top: `${rect.y}px`,

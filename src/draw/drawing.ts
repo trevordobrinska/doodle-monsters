@@ -1,4 +1,4 @@
-import type { InkFacts, Point } from "../core/gameCore";
+import { ARENA, type InkFacts, type Point } from "../core/gameCore";
 
 /**
  * A drawing in progress: the strokes a kid has made, plus the sums the
@@ -11,7 +11,8 @@ import type { InkFacts, Point } from "../core/gameCore";
  * sizes and ink amounts mean the same on every device.
  */
 
-export const SURFACE = { width: 1280, height: 800 } as const;
+/** The drawing surface is the Arena's size, so a drawing maps onto it 1:1. */
+export const SURFACE = ARENA;
 
 /** About 8 bright colors. Names are what the core (and later the Bio) hears. */
 export const COLORS = [

@@ -247,8 +247,11 @@ interface Round
   finishDrawing(ink: InkFacts): boolean;
 }
 
-/** Landscape Fire HD 8 resolution: the size every rule is designed against. */
-const ARENA: Arena = { width: 1280, height: 800 };
+/**
+ * Landscape Fire HD 8 resolution: the size every rule is designed against.
+ * Also the drawing surface's size, and what every screen fit fits.
+ */
+export const ARENA: Arena = { width: 1280, height: 800 };
 
 /**
  * Every Monster's longest side, in arena units, however big it was drawn,

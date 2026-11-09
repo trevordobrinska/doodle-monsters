@@ -367,6 +367,7 @@
         display: flex;
         gap: 24px;
         align-items: center;
+        /* Fallback for browsers without container query units; overridden below where cqw/cqh work. */
         max-width: min(900px, 92vw);
         max-height: 90vh;
         /* The frame's size, so the card still fits once the app is turned. */
