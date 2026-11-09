@@ -5,7 +5,7 @@
  */
 export interface FullscreenDocument {
   readonly fullscreenElement?: Element | null;
-  webkitFullscreenElement?: Element | null;
+  readonly webkitFullscreenElement?: Element | null;
   readonly documentElement: {
     requestFullscreen?(options?: FullscreenOptions): Promise<void>;
     webkitRequestFullscreen?(): void;

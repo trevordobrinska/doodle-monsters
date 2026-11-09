@@ -4,7 +4,7 @@
 
 **Blocked by:** None.
 
-**Status:** resolved
+**Status:** done
 
 **The probe:** a throwaway page at `public/fullscreen-probe/index.html`. Once pushed it lives at https://trevordobrinska.github.io/doodle-monsters/fullscreen-probe/. It's a plain static file with no build step and no game code. Delete the folder once this ticket is answered.
 

@@ -4,35 +4,34 @@ import { askForFullscreen, type FullscreenDocument } from "./fullscreen";
 /** A fake document that records each fullscreen request made on its root element. */
 function fakeDocument(
   options: {
-    fullscreenElement?: unknown;
-    webkitFullscreenElement?: unknown;
+    fullscreenElement?: Element | null;
+    webkitFullscreenElement?: Element | null;
     requestFullscreen?: (options?: FullscreenOptions) => Promise<void>;
     webkitRequestFullscreen?: () => void;
   } = {},
 ) {
   const requests: string[] = [];
-  const documentElement: FullscreenDocument["documentElement"] = {};
-  if (options.requestFullscreen) {
-    const request = options.requestFullscreen;
-    documentElement.requestFullscreen = (opts?: FullscreenOptions) => {
-      requests.push(`standard ${JSON.stringify(opts)}`);
-      return request(opts);
-    };
-  }
-  if (options.webkitRequestFullscreen) {
-    const request = options.webkitRequestFullscreen;
-    documentElement.webkitRequestFullscreen = () => {
-      requests.push("webkit");
-      request();
-    };
-  }
+  const { requestFullscreen, webkitRequestFullscreen } = options;
   const doc: FullscreenDocument = {
-    fullscreenElement: (options.fullscreenElement ?? null) as Element | null,
-    documentElement,
+    fullscreenElement: options.fullscreenElement ?? null,
+    ...("webkitFullscreenElement" in options && {
+      webkitFullscreenElement: options.webkitFullscreenElement ?? null,
+    }),
+    documentElement: {
+      ...(requestFullscreen && {
+        requestFullscreen: (opts?: FullscreenOptions) => {
+          requests.push(`standard ${JSON.stringify(opts)}`);
+          return requestFullscreen(opts);
+        },
+      }),
+      ...(webkitRequestFullscreen && {
+        webkitRequestFullscreen: () => {
+          requests.push("webkit");
+          webkitRequestFullscreen();
+        },
+      }),
+    },
   };
-  if ("webkitFullscreenElement" in options) {
-    doc.webkitFullscreenElement = (options.webkitFullscreenElement ?? null) as Element | null;
-  }
   return { doc, requests };
 }
 
@@ -48,7 +47,7 @@ describe("asking for fullscreen", () => {
   });
 
   it("doesn't ask when the page is already fullscreen", () => {
-    const { doc, requests } = fakeDocument({ fullscreenElement: {}, requestFullscreen: granted });
+    const { doc, requests } = fakeDocument({ fullscreenElement: {} as Element, requestFullscreen: granted });
 
     askForFullscreen(doc);
 
@@ -64,7 +63,7 @@ describe("asking for fullscreen", () => {
   });
 
   it("doesn't ask when a webkit-only page is already fullscreen", () => {
-    const { doc, requests } = fakeDocument({ webkitFullscreenElement: {}, webkitRequestFullscreen: () => {} });
+    const { doc, requests } = fakeDocument({ webkitFullscreenElement: {} as Element, webkitRequestFullscreen: () => {} });
 
     askForFullscreen(doc);
 

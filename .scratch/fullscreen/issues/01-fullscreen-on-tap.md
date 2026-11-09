@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [x] A small fullscreen module asks for fullscreen (`requestFullscreen({ navigationUI: "hide" })`, falling back to `webkitRequestFullscreen`). It only asks when the page isn't already fullscreen and an API exists, swallows refusals silently, and takes the document as a parameter
 - [x] Vitest tests with a fake document: asks when not fullscreen; skips when already fullscreen; uses the webkit fallback; does nothing without an API; a rejected request doesn't throw
