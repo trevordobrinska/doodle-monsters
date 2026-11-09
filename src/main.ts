@@ -9,6 +9,8 @@ import {
 import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
 import { createHabitatRenderer } from "./render/habitatRenderer";
+import { windowSize } from "./render/letterbox";
+import { fitScreen } from "./core/screenFit";
 import { indexedDbZooStorage } from "./storage/indexedDbZooStorage";
 import { listenForGestures } from "./input/gestures";
 import { createSound, type Effect } from "./sound/sound";
@@ -87,6 +89,7 @@ const core: GameCore = createGameCore({ clock: systemClock, dice: randomDice, st
 core.setHardMode(savedHardMode());
 const habitat = createHabitatRenderer(canvas, core);
 habitat.resize();
+placeZooOverlay();
 /** The Catch's renderer. Only exists once the drawing is done and the Catch has begun. */
 let renderer: Renderer | undefined;
 let catchStartedAt = 0;
@@ -262,7 +265,23 @@ seedForDev()
 window.addEventListener("resize", () => {
   renderer?.resize();
   habitat.resize();
+  placeZooOverlay();
 });
+
+/**
+ * The zoo overlay sits on the Habitat's rectangle, not the window, so the Draw
+ * button and the Habitat arrows stay off the bars. Same fit as the Letterbox,
+ * so they can't disagree about where the Habitat is. Buttons keep their pixel sizes.
+ */
+function placeZooOverlay() {
+  const { rect } = fitScreen(windowSize(), core.arena);
+  Object.assign(zooRoot!.style, {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+  });
+}
 
 function noteIfCaught(result: TapResult | FlickResult) {
   if (result !== "caught") return;
