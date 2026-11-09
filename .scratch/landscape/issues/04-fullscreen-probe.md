@@ -4,7 +4,7 @@
 
 **Blocked by:** None.
 
-**Status:** ready-for-human
+**Status:** done
 
 **The probe:** a throwaway page at `public/fullscreen-probe/index.html`. Once pushed it lives at https://trevordobrinska.github.io/doodle-monsters/fullscreen-probe/. It's a plain static file with no build step and no game code. Delete the folder once this ticket is answered.
 
@@ -40,3 +40,5 @@
 - **Getting out:** the system back button exits fullscreen, and the browser bar comes back. So a kid always has a way out, even without the ⌂ button.
 - **Landscape lock:** both button 2 (fullscreen + lock) and button 3 (lock alone) log "Screen orientation lock is not available on this device." So there is no landscape lock, even when fullscreen, and the sideways turn from ticket 02 stays.
 - **Still untested:** fullscreen when the page is opened through the Arcade from My Stuff, the way the game is really reached.
+
+**2026-11-08 (agent), resolved.** Answered well enough to act on: fullscreen works on a tap, Back leaves it, and there's no landscape lock. The follow-up is `.scratch/fullscreen/spec.md` (fullscreen on the first tap), and ADR 0002 now says so. The probe page `public/fullscreen-probe/` is deleted (fullscreen ticket 01). The one open question, whether fullscreen also works when the game is opened through the Arcade from My Stuff, moves to `.scratch/fullscreen/issues/02-tablet-check.md`.
