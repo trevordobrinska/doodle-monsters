@@ -31,3 +31,22 @@ export function askForFullscreen(doc: FullscreenDocument): void {
     // Refused straight away (some browsers throw instead of rejecting): stay as we are.
   }
 }
+
+/** The bit of the app root that listening for taps needs, so tests can pass a fake. */
+export interface TapTarget {
+  addEventListener(type: "pointerup", listener: () => void, options: AddEventListenerOptions): void;
+}
+
+/**
+ * Asks for fullscreen on every tap, for the life of the page, so it's asked
+ * again after Back or a page change ends it (ADR 0002).
+ *
+ * On a finger lifting, not touching down: browsers only count a touch as a
+ * user action (which fullscreen needs) when the finger lifts. A mouse button
+ * counts on press, and a lift straight after it still counts. Capture phase and
+ * passive, never stopped or prevented, so the same tap still presses its
+ * button, Bonks or draws.
+ */
+export function askForFullscreenOnTaps(root: TapTarget, doc: FullscreenDocument): void {
+  root.addEventListener("pointerup", () => askForFullscreen(doc), { capture: true, passive: true });
+}

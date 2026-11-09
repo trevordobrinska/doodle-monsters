@@ -14,7 +14,7 @@ import { viewportSize } from "./render/viewport";
 import { fitScreen } from "./core/screenFit";
 import { indexedDbZooStorage } from "./storage/indexedDbZooStorage";
 import { listenForGestures } from "./input/gestures";
-import { askForFullscreen } from "./input/fullscreen";
+import { askForFullscreenOnTaps } from "./input/fullscreen";
 import { createSound, type Effect } from "./sound/sound";
 import { createDrawScreen } from "./draw/drawScreen";
 import { createBringToLifeScreen } from "./bringToLife/bringToLifeScreen";
@@ -41,10 +41,7 @@ if (!appRoot) throw new Error("Missing #app");
 // this resize listener runs before the screens' own, so they measure the new frame.
 placeAppRoot();
 window.addEventListener("resize", placeAppRoot);
-// Every tap asks for fullscreen until it's granted, and again after Back or a
-// page change ends it (ADR 0002). Capture and passive, never stopped or
-// prevented, so the same tap still presses its button, Bonks or draws.
-appRoot.addEventListener("pointerdown", () => askForFullscreen(document), { capture: true, passive: true });
+askForFullscreenOnTaps(appRoot, document);
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");

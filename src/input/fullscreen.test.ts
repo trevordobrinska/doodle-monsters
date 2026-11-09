@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askForFullscreen, type FullscreenDocument } from "./fullscreen";
+import { askForFullscreen, askForFullscreenOnTaps, type FullscreenDocument } from "./fullscreen";
 
 /** A fake document that records each fullscreen request made on its root element. */
 function fakeDocument(
@@ -98,5 +98,42 @@ describe("asking for fullscreen", () => {
     });
 
     expect(() => askForFullscreen(doc)).not.toThrow();
+  });
+});
+
+describe("askForFullscreenOnTaps", () => {
+  /** A fake app root that keeps its listeners so a test can fire them. */
+  function fakeRoot() {
+    const listeners: { type: string; options: unknown; fire: () => void }[] = [];
+    return {
+      listeners,
+      addEventListener(type: string, listener: () => void, options?: unknown) {
+        listeners.push({ type, options, fire: listener });
+      },
+    };
+  }
+
+  // A finger touching down isn't a user action that lets a page go
+  // fullscreen; only lifting it is. Asking on touch-down was refused on the
+  // tablet, so the Draw tap didn't go fullscreen and the first drawn line did.
+  it("asks when a finger lifts, not when it touches down", () => {
+    const root = fakeRoot();
+    askForFullscreenOnTaps(root, fakeDocument({ requestFullscreen: granted }).doc);
+    expect(root.listeners.map((l) => l.type)).toEqual(["pointerup"]);
+  });
+
+  it("listens in the capture phase and passively, so the tap still does its job", () => {
+    const root = fakeRoot();
+    askForFullscreenOnTaps(root, fakeDocument({ requestFullscreen: granted }).doc);
+    expect(root.listeners[0]!.options).toEqual({ capture: true, passive: true });
+  });
+
+  it("asks for fullscreen on every lift", () => {
+    const root = fakeRoot();
+    const { doc, requests } = fakeDocument({ requestFullscreen: granted });
+    askForFullscreenOnTaps(root, doc);
+    root.listeners[0]!.fire();
+    root.listeners[0]!.fire();
+    expect(requests).toHaveLength(2);
   });
 });
