@@ -1,4 +1,5 @@
 import {
+  ARENA,
   createGameCore,
   type FlickResult,
   type GameCore,
@@ -9,6 +10,8 @@ import {
 import type { Clock, Dice } from "./core/deps";
 import { createRenderer, type Renderer } from "./render/renderer";
 import { createHabitatRenderer } from "./render/habitatRenderer";
+import { viewportSize } from "./render/viewport";
+import { fitScreen } from "./core/screenFit";
 import { indexedDbZooStorage } from "./storage/indexedDbZooStorage";
 import { listenForGestures } from "./input/gestures";
 import { createSound, type Effect } from "./sound/sound";
@@ -30,6 +33,13 @@ const OFF_TO_ZOO_AFTER_MS = 3500;
 // so tests can swap in fake ones.
 const systemClock: Clock = { now: () => Date.now() };
 const randomDice: Dice = { roll: () => Math.random() };
+
+const appRoot = document.querySelector<HTMLElement>("#app");
+if (!appRoot) throw new Error("Missing #app");
+// Before anything measures itself: the first frame is already turned right, and
+// this resize listener runs before the screens' own, so they measure the new frame.
+placeAppRoot();
+window.addEventListener("resize", placeAppRoot);
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 if (!canvas) throw new Error("Missing #game canvas");
@@ -87,6 +97,7 @@ const core: GameCore = createGameCore({ clock: systemClock, dice: randomDice, st
 core.setHardMode(savedHardMode());
 const habitat = createHabitatRenderer(canvas, core);
 habitat.resize();
+placeZooOverlay();
 /** The Catch's renderer. Only exists once the drawing is done and the Catch has begun. */
 let renderer: Renderer | undefined;
 let catchStartedAt = 0;
@@ -262,7 +273,33 @@ seedForDev()
 window.addEventListener("resize", () => {
   renderer?.resize();
   habitat.resize();
+  placeZooOverlay();
 });
+
+/**
+ * Landscape only (ADR 0002): every screen sits in one app root, sized to the
+ * screen fit's frame and, when the window is tall, turned a quarter by CSS so
+ * it fills the long side. Only re-lays out: no game state is touched.
+ */
+function placeAppRoot() {
+  const { frame, transform } = fitScreen(viewportSize(), ARENA);
+  Object.assign(appRoot!.style, { width: `${frame.width}px`, height: `${frame.height}px`, transform });
+}
+
+/**
+ * The zoo overlay sits on the Habitat's rectangle, not the window, so the Draw
+ * button and the Habitat arrows stay off the bars. Same fit as the Letterbox,
+ * so they can't disagree about where the Habitat is. Buttons keep their pixel sizes.
+ */
+function placeZooOverlay() {
+  const { rect } = fitScreen(viewportSize(), ARENA);
+  Object.assign(zooRoot!.style, {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+  });
+}
 
 function noteIfCaught(result: TapResult | FlickResult) {
   if (result !== "caught") return;
