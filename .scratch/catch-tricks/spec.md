@@ -41,3 +41,7 @@ A Catch can't fail, a Monster is never hurt, and each Monster is drawn once and 
 - **A score or personal best:** only if hard mode plus Tricks still don't challenge the 10-year-old.
 - **V2 rule changes:** losing, timers, re-catching, or a separate game.
 - **Tricks based on the drawing**, such as eye count or main color, as an extra layer on top of Temperament Tricks.
+
+## Comments
+
+**2026-11-08 (close-out):** Decision: merge `catch-tricks` into `master` now, before the ticket 07 playtest.
